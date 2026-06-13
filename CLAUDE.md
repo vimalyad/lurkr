@@ -177,7 +177,7 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - [x] M7 — Live data (hybrid): Tavily web search (all buckets) + Google News RSS (sales recency). `/api/gather` collects bucketed signals per competitor; analysts now ground findings in them. Verified: real funding/hiring/Trustpilot signals cited in findings. TAVILY_API_KEY set in `.env.local`.
 - [ ] M7.5 (optional) — structured sources where resolvable: Greenhouse/Lever job APIs, app-store/play review scrapers.
 - [x] M8 — Design overhaul: "intelligence terminal / surveillance dossier" aesthetic (built via the frontend-design skill).
-- [ ] M9 — Automatic Prompt Optimization harness (offline OPRO/judge loop to improve the agent prompts).
+- [x] M9 — Automatic Prompt Optimization harness (offline OPRO/judge loop). Analyst prompts in `agents.js` are the tuned winners.
 - [ ] M10 — Neon persistence + GitHub Actions scheduling + Resend email alerts
 
 ## Phone testing (do this BEFORE Vercel deploy)
@@ -197,3 +197,9 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - REMOVED in M6: `src/lib/seed.js`, `src/app/api/injected/route.js` (demo-only). `seed-data.json` kept as reference only. Toast/live-flash keyframes remain in `globals.css` (unused for now; may return as M8 alerts).
 - Design system (M8): dark "intelligence terminal" aesthetic. Fonts via `next/font` in `layout.js` — Instrument Serif (display), Hanken Grotesk (body), JetBrains Mono (data/labels), exposed as Tailwind `font-serif`/`font-sans`/`font-mono` through `@theme inline` in `globals.css`. Amber signal accent `--color-signal: #f5b544` + semantic red/green. Atmosphere (grid + amber wash + grain + vignette) via `body::before/::after`; `.panel`, `.label`, `.reveal`, `.watch-dot/.watch-ring` component/anim classes in `globals.css`.
 - Local dev: `npm run dev` (:3000), LAN-reachable (`allowedDevOrigins` in `next.config.mjs`). `.env.local` holds `OPENROUTER_API_KEY` + `TAVILY_API_KEY` (gitignored; overrides `.env`).
+
+## Prompt optimization (APO) — M9
+- `scripts/optimize-prompts.mjs` — offline OPRO-style optimizer for the analyst prompts. For an agent it: evaluates the current ("seed") prompt on fixed eval cases → scores each output with an LLM-as-judge (rubric: grounding in signals, specificity, relevance to the user's idea, schema validity) → an optimizer LLM proposes a better prompt from the scored history → loops, keeps the best. Writes `scripts/optimized-prompts.json` (winners + score history).
+- Run: `node scripts/optimize-prompts.mjs [marketing|product|sales|all] [rounds]` (reads `OPENROUTER_API_KEY` from `.env.local`).
+- The MARKETING/PRODUCT/SALES prompts in `src/lib/agents.js` are the APO-tuned winners (judge scores: marketing 72→78, product 75→80, sales 58.5→75). To re-optimize: re-run and copy the new winners back into `agents.js`.
+- Purely OFFLINE — not in the request path; never mutates the live app automatically (human reviews/copies winners). Metric is a small LLM-judged sample, so treat small deltas as noise.
