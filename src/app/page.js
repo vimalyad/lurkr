@@ -49,18 +49,23 @@ export default function Home() {
   const [agents, setAgents] = useState(initialAgentState);
   const [strategy, setStrategy] = useState({ status: "idle", brief: null });
   const [sweeping, setSweeping] = useState(false);
+  const [injecting, setInjecting] = useState(false);
+  const [injected, setInjected] = useState(false);
+  const [toast, setToast] = useState(null); // { kind, title }
   const [error, setError] = useState(null);
 
   const setAgent = (id, patch) =>
     setAgents((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
 
+  // Run Marketing/Product/Sales in parallel, then feed all three to Strategy.
   const runSweep = useCallback(async () => {
     setSweeping(true);
     setError(null);
+    setToast(null);
+    setInjected(false);
     setStrategy({ status: "idle", brief: null });
     setAgents(initialAgentState());
 
-    // 1) Fire the three analysts IN PARALLEL. Each card flips done as it resolves.
     ANALYSTS.forEach((a) => setAgent(a.id, { status: "analyzing", findings: [] }));
 
     const results = await Promise.all(
@@ -86,10 +91,14 @@ export default function Home() {
       return;
     }
 
-    // 2) Strategy CONSUMES the three analysts' output and synthesizes the brief.
+    await synthesize(Object.fromEntries(results));
+    setSweeping(false);
+  }, []);
+
+  // POST the analysts' findings (+ optional live signal) to the Strategy agent.
+  async function synthesize(payload) {
     setStrategy({ status: "analyzing", brief: null });
     try {
-      const payload = Object.fromEntries(results);
       const res = await fetch("/api/strategy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,16 +107,60 @@ export default function Home() {
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Strategy failed");
       setStrategy({ status: "done", brief: data });
+      return data;
     } catch (err) {
       setStrategy({ status: "error", brief: null });
       setError(String(err.message || err));
-    } finally {
-      setSweeping(false);
+      return null;
     }
-  }, []);
+  }
+
+  // Demo money-shot: drop in the held-back live signal, re-synthesize, fire the alert.
+  const injectLiveSignal = useCallback(async () => {
+    setInjecting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/injected");
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "No live signal");
+      const signal = data.signal;
+
+      // Show it landing on the Sales agent with a live flash.
+      const liveFinding = {
+        competitor: signal.competitor,
+        buying_signal: signal.content,
+        urgency: signal.urgency,
+        detail: "LIVE — just detected",
+        live: true,
+      };
+      const salesWithLive = [liveFinding, ...agents.sales.findings];
+      setAgent("sales", { findings: salesWithLive });
+
+      // Re-synthesize with the injected signal in the mix.
+      const brief = await synthesize({
+        marketing: agents.marketing.findings,
+        product: agents.product.findings,
+        sales: agents.sales.findings,
+        injected: signal,
+      });
+
+      setInjected(true);
+      if (brief?.threat) {
+        setToast({ kind: "threat", title: brief.threat.title });
+      }
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setInjecting(false);
+    }
+  }, [agents]);
+
+  const sweepDone = strategy.status === "done";
 
   return (
     <main className="min-h-dvh px-5 py-8 max-w-5xl mx-auto">
+      {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
+
       <header className="flex flex-wrap items-end justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Lurkr</h1>
@@ -115,13 +168,24 @@ export default function Home() {
             always watching, never blinking — the intelligence team that never sleeps
           </p>
         </div>
-        <button
-          onClick={runSweep}
-          disabled={sweeping}
-          className="rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-5 py-2.5 text-sm font-semibold transition-colors"
-        >
-          {sweeping ? "Sweeping…" : "Run Intelligence Sweep"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={runSweep}
+            disabled={sweeping || injecting}
+            className="rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-5 py-2.5 text-sm font-semibold transition-colors"
+          >
+            {sweeping ? "Sweeping…" : "Run Intelligence Sweep"}
+          </button>
+          {sweepDone && !injected && (
+            <button
+              onClick={injectLiveSignal}
+              disabled={injecting}
+              className="rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 px-5 py-2.5 text-sm font-semibold transition-colors"
+            >
+              {injecting ? "Detecting…" : "⚡ Inject Live Signal"}
+            </button>
+          )}
+        </div>
       </header>
 
       {error && (
@@ -152,10 +216,17 @@ export default function Home() {
                 {state.findings.map((f, i) => (
                   <div
                     key={i}
-                    className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"
+                    className={`rounded-lg border p-3 ${
+                      f.live
+                        ? "border-red-700 bg-red-950/40 animate-live-flash"
+                        : "border-neutral-800 bg-neutral-950/60"
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium">{f.competitor}</span>
+                      <span className="text-sm font-medium">
+                        {f.live && <span className="text-red-400">● LIVE </span>}
+                        {f.competitor}
+                      </span>
                       {a.tag(f) && (
                         <span className="text-[10px] rounded-full bg-neutral-800 px-2 py-0.5 text-neutral-300 whitespace-nowrap">
                           {a.tag(f)}
@@ -235,6 +306,40 @@ export default function Home() {
         )}
       </section>
     </main>
+  );
+}
+
+function Toast({ toast, onClose }) {
+  const isThreat = toast.kind === "threat";
+  return (
+    <div
+      className={`animate-toast-in fixed left-1/2 top-4 z-50 w-[min(92vw,30rem)] -translate-x-1/2 rounded-xl border p-4 shadow-2xl ${
+        isThreat
+          ? "border-red-600 bg-red-950/90 shadow-red-950/50"
+          : "border-emerald-600 bg-emerald-950/90"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="text-xl leading-none">{isThreat ? "🔴" : "🟢"}</span>
+        <div className="flex-1">
+          <p
+            className={`text-xs font-bold uppercase tracking-wider ${
+              isThreat ? "text-red-300" : "text-emerald-300"
+            }`}
+          >
+            {isThreat ? "Threat Detected" : "Opportunity"}
+          </p>
+          <p className="mt-1 text-sm font-medium text-neutral-100">{toast.title}</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-neutral-400 hover:text-neutral-200 text-sm"
+          aria-label="Dismiss"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
   );
 }
 
