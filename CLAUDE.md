@@ -144,8 +144,17 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - [x] Plan + architecture locked
 - [x] Seed data generated (seed-data.json)
 - [x] Scaffold + one agent working end-to-end (Next.js 16 PWA + Marketing AI returning real JSON via OpenRouter)
-- [ ] Full 4-agent pipeline
-- [ ] Dashboard UI
+- [x] Full 4-agent pipeline (parallel analysts -> Strategy synthesis; verified the Recapio-threat / Klarith-opportunity punchline)
+- [~] Dashboard UI (functional dashboard shipped with the pipeline; polish pass still pending)
 - [ ] Alert money-shot
 - [ ] Mobile/laptop views
 - [ ] Deploy + rehearse
+
+## Current implementation map (keep this current)
+- `src/lib/agents.js` — 4 system prompts + `MODELS` (analysts: `anthropic/claude-3.5-haiku`, Strategy: `anthropic/claude-sonnet-4.5`) + `ANALYSTS`/`STRATEGY` configs.
+- `src/lib/openrouter.js` — `runAgent()`: OpenRouter call, try/catch + 1 retry, `parseJsonLoose()` strips ```json fences (the Strategy model wraps JSON in fences despite `response_format`).
+- `src/lib/seed.js` — imports `seed-data.json`.
+- `src/app/api/agent/[id]/route.js` — GET, runs ONE analyst (marketing/product/sales) against its seed slice.
+- `src/app/api/strategy/route.js` — POST `{marketing, product, sales, injected?}`, returns the brief.
+- `src/app/page.js` — dashboard. Client orchestrates the pipeline: fires the 3 analysts in parallel (`Promise.all`), each card flips idle->analyzing->done as it resolves, then POSTs all three to Strategy. This client-side orchestration is what makes the multi-agent flow VISIBLE.
+- Local dev: `npm run dev` (default :3000). `.env.local` holds the real `OPENROUTER_API_KEY` (gitignored; it overrides `.env`).
