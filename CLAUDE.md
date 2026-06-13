@@ -147,8 +147,8 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - [x] Full 4-agent pipeline (parallel analysts -> Strategy synthesis; verified the Recapio-threat / Klarith-opportunity punchline)
 - [~] Dashboard UI (functional + styled dashboard shipped; deeper polish optional)
 - [x] Alert money-shot (Inject Live Signal -> re-synthesize -> THREAT toast; verified escalation to team-chat distribution land-grab)
-- [~] Mobile/laptop views (responsive dashboard: sticky reachable action bar, full-width touch targets, stacked cards on phone / multi-col on laptop). Testing on the iQOO over LAN BEFORE deploying.
-- [ ] Deploy + rehearse
+- [x] Mobile/laptop views (responsive dashboard; verified live on the iQOO over LAN)
+- [~] Deploy + rehearse (demo script written in DEMO.md; Vercel deploy pending — needs the user's Vercel account + OPENROUTER_API_KEY env var set in Vercel)
 
 ## Phone testing (do this BEFORE Vercel deploy)
 - Same Wi-Fi, open `http://192.168.1.139:3000` on the iQOO (LAN IP of this laptop; re-check if the network changes).
