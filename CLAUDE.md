@@ -64,7 +64,8 @@ out of scope for the judged demo).
   then Strategy visibly CONSUMES the three cards and produces the brief.
 - Judges must SEE agents feeding each other. Invisible orchestration looks like one chatbot.
 
-## Agent prompts (each returns ONLY JSON, no markdown; guard parse with try/catch + 1 retry)
+## Agent prompts  ← HISTORICAL (demo-era seed prompts). LIVE prompts now live in `src/lib/agents.js` and are idea-aware + signal-grounded.
+(each returns ONLY JSON, no markdown; guard parse with try/catch + 1 retry)
 
 ### Marketing AI  — input: marketing_signals from seed-data.json
 "You are a marketing intelligence analyst. From the provided competitor marketing signals, identify
@@ -156,7 +157,7 @@ const data = await res.json();
 const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 ```
 
-## Suggested first commands in this Claude Code session
+## Suggested first commands  ← HISTORICAL (initial hackathon scaffolding prompts; the app is long since scaffolded)
 1. "Read CLAUDE.md and seed-data.json fully. Then scaffold the Next.js PWA (manifest + icon + Add-to-Home-Screen),
    wire in seed-data.json, and create the 4 agent prompt files per the 0:00-1:00 plan. Get ONE agent
    (Marketing) returning real JSON from the seed data end-to-end before building anything else."
@@ -173,7 +174,8 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - [~] Deploy + rehearse (demo script written in DEMO.md; Vercel deploy pending — needs the user's Vercel account + OPENROUTER_API_KEY env var set in Vercel)
 - --- REAL-DATA PIVOT ---
 - [x] M6 — Idea input + competitor discovery + idea-aware analysis (verified end-to-end: idea -> 5 real competitors -> analysts -> personalized brief; keyless, LLM-knowledge based)
-- [ ] M7 — Live data (hybrid: Tavily/Brave search + Google News RSS + app-store/play reviews + Greenhouse/Lever jobs). Needs TAVILY_API_KEY.
+- [x] M7 — Live data (hybrid): Tavily web search (all buckets) + Google News RSS (sales recency). `/api/gather` collects bucketed signals per competitor; analysts now ground findings in them. Verified: real funding/hiring/Trustpilot signals cited in findings. TAVILY_API_KEY set in `.env.local`.
+- [ ] M7.5 (optional) — structured sources where resolvable: Greenhouse/Lever job APIs, app-store/play review scrapers.
 - [ ] M8 — Neon persistence + GitHub Actions scheduling + Resend email alerts
 
 ## Phone testing (do this BEFORE Vercel deploy)
@@ -184,9 +186,11 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 ## Current implementation map (keep this current) — post-M6
 - `src/lib/agents.js` — `MODELS` (analysts: `anthropic/claude-3.5-haiku`; Strategy + Discovery: `anthropic/claude-sonnet-4.5`). `DISCOVERY` + idea-aware `ANALYSTS` + `STRATEGY` prompts. Analysts take `{your_idea, your_features, competitors}`.
 - `src/lib/openrouter.js` — `runAgent()`: OpenRouter call, try/catch + 1 retry, `parseJsonLoose()` strips ```json fences (the Strategy model wraps JSON in fences despite `response_format`).
+- `src/lib/sources/tavily.js` — `tavilySearch(query, opts)` (needs `TAVILY_API_KEY`). `src/lib/sources/news.js` — `googleNews(query)` (keyless RSS).
 - `src/app/api/discover/route.js` — POST `{idea, features}` → `{space, competitors:[{name,website,description,why_relevant}]}`.
-- `src/app/api/agent/[id]/route.js` — POST `{idea, features, competitors}`, runs ONE analyst over the competitors.
+- `src/app/api/gather/route.js` — POST `{competitors}` → `{marketing, product, sales, counts}`; per competitor runs bucketed Tavily searches + Google News (best-effort, a failing source = empty list).
+- `src/app/api/agent/[id]/route.js` — POST `{idea, features, competitors, signals}`, runs ONE analyst grounded in its signal bucket.
 - `src/app/api/strategy/route.js` — POST `{idea, features, marketing, product, sales}` → personalized brief.
-- `src/app/page.js` — idea form → discover competitors (editable list) → "Run Intelligence Sweep" fires the 3 analysts in parallel, then Strategy. Client orchestration keeps the multi-agent flow VISIBLE.
+- `src/app/page.js` — idea form → discover competitors (editable list) → "Run Intelligence Sweep" = gather live signals (`/api/gather`) → 3 analysts in parallel (each grounded in its bucket) → Strategy. Shows gathering status + per-bucket signal counts. Client orchestration keeps the multi-agent flow VISIBLE.
 - REMOVED in M6: `src/lib/seed.js`, `src/app/api/injected/route.js` (demo-only). `seed-data.json` kept as reference only. Toast/live-flash keyframes remain in `globals.css` (unused for now; may return as M8 alerts).
 - Local dev: `npm run dev` (:3000), LAN-reachable (`allowedDevOrigins` in `next.config.mjs`). `.env.local` holds `OPENROUTER_API_KEY` (gitignored; overrides `.env`).

@@ -1,22 +1,23 @@
-# Lurkr — 3-Minute Demo Script
+# Lurkr — Demo Walkthrough
 
-> Practice until muscle memory. Phone in hand (monitoring), laptop mirrored (deep report).
-> The climax is the live signal injection firing the THREAT alert.
+> A tight ~3-minute walkthrough of the real product. Phone in hand (monitoring),
+> laptop mirrored (the deep brief).
 
-## The 6-line script
-1. **Hook:** "Startups can't afford a market research team. Lurkr is one — four AI agents that never sleep, watching your competitors." (Dashboard open, idle.)
-2. **Run:** Tap **Run Intelligence Sweep** → "Marketing, Product, and Sales agents analyze in parallel — real LLM calls, not canned." (Cards flip analyzing → done.)
-3. **Synthesis:** "Now the Strategy agent *consumes* all three and writes the executive brief." (Strategy card fills: Threat + Opportunity.)
-4. **Payoff:** "It connected dots across agents: Recapio is a funded down-market land-grab — the threat. Klarith's ignored mobile gap — our opportunity. Driftwave is noise, correctly ignored."
-5. **Live alert:** Tap **⚡ Inject Live Signal** → "Breaking news just hit — Recapio lands a default integration deal." → **🔴 Threat Detected** toast fires, brief re-synthesizes to *urgent*.
-6. **Close:** "Phone for monitoring and alerts, laptop for the deep report — same app, always watching. That's Lurkr."
+## The script
+1. **Hook:** "Most startups can't afford a market research team. Lurkr is one — you describe your idea, and a team of AI agents finds and watches your competitors for you."
+2. **Input:** Type the idea (e.g. *"a mobile-first AI notetaker for fast-moving teams"*) + a few features → tap **Find my competitors**.
+3. **Discovery:** "It just identified the real players in this space" — point at the discovered list (real companies, real sites). You can drop any that don't fit.
+4. **Sweep:** Tap **Run Intelligence Sweep** → "First it gathers *live* data — web and news on each competitor — then three agents analyze it in parallel." (Signal counts appear; cards flip analyzing → done.)
+5. **Synthesis:** "Then the Strategy agent consumes all three and writes the brief for *my* product." → read the **Threat** and **Opportunity**, both tied to real, cited signals (e.g. a real funding round, real hiring, real reviews).
+6. **Close:** "Live data, grounded analysis, personalized to your idea — and it never sleeps. That's Lurkr."
 
 ## Pre-demo checklist
-- [ ] Deployed URL open on laptop (mirrored) AND phone, both on good network.
-- [ ] Did one warm-up sweep beforehand (first LLM call can be slow / cold).
-- [ ] Phone added to Home Screen (PWA) for the install story — needs the HTTPS deploy.
-- [ ] **Backup screen recording** of a full successful run saved locally (in case the network/API flakes live).
+- [ ] `OPENROUTER_API_KEY` and `TAVILY_API_KEY` set (in `.env.local`, or in Vercel env for the deployed URL).
+- [ ] Do one warm-up run beforehand (first LLM + gather call can be slow cold).
+- [ ] Pick an idea whose competitors have rich public footprints (well-known SaaS) so signals are plentiful.
+- [ ] Phone added to Home Screen (PWA) — needs the HTTPS deploy.
+- [ ] **Backup screen recording** of a full successful run, in case the network/API flakes live.
 
 ## If something breaks live
-- LLM call slow/fails → "It's making live calls — here's the run I captured moments ago" → play the backup recording.
-- Don't inject the live signal until *after* the first sweep fully completes (the button only appears then).
+- Gather or an LLM call is slow/fails → "It's making live calls right now — here's a run I captured a moment ago" → play the backup recording.
+- A source returns nothing → gather is best-effort, so the sweep still runs; just narrate that signal coverage varies by competitor.
