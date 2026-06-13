@@ -158,33 +158,35 @@ export default function Home() {
   const sweepDone = strategy.status === "done";
 
   return (
-    <main className="min-h-dvh px-5 py-8 max-w-5xl mx-auto">
+    <main className="min-h-dvh px-4 sm:px-5 pb-10 max-w-5xl mx-auto">
       {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
 
-      <header className="flex flex-wrap items-end justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Lurkr</h1>
-          <p className="text-sm text-neutral-400 mt-1">
-            always watching, never blinking — the intelligence team that never sleeps
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={runSweep}
-            disabled={sweeping || injecting}
-            className="rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-5 py-2.5 text-sm font-semibold transition-colors"
-          >
-            {sweeping ? "Sweeping…" : "Run Intelligence Sweep"}
-          </button>
-          {sweepDone && !injected && (
+      <header className="sticky top-0 z-30 -mx-4 sm:-mx-5 px-4 sm:px-5 py-4 mb-5 border-b border-neutral-900 bg-[#0a0a0f]/85 backdrop-blur">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Lurkr</h1>
+            <p className="text-xs sm:text-sm text-neutral-400 mt-1">
+              always watching, never blinking — the team that never sleeps
+            </p>
+          </div>
+          <div className="flex gap-2">
             <button
-              onClick={injectLiveSignal}
-              disabled={injecting}
-              className="rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 px-5 py-2.5 text-sm font-semibold transition-colors"
+              onClick={runSweep}
+              disabled={sweeping || injecting}
+              className="flex-1 sm:flex-none rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 px-5 py-3 sm:py-2.5 text-sm font-semibold transition-colors"
             >
-              {injecting ? "Detecting…" : "⚡ Inject Live Signal"}
+              {sweeping ? "Sweeping…" : "Run Intelligence Sweep"}
             </button>
-          )}
+            {sweepDone && !injected && (
+              <button
+                onClick={injectLiveSignal}
+                disabled={injecting}
+                className="flex-1 sm:flex-none rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:opacity-50 px-5 py-3 sm:py-2.5 text-sm font-semibold transition-colors"
+              >
+                {injecting ? "Detecting…" : "⚡ Inject Live Signal"}
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
