@@ -147,8 +147,13 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - [x] Full 4-agent pipeline (parallel analysts -> Strategy synthesis; verified the Recapio-threat / Klarith-opportunity punchline)
 - [~] Dashboard UI (functional + styled dashboard shipped; deeper polish optional)
 - [x] Alert money-shot (Inject Live Signal -> re-synthesize -> THREAT toast; verified escalation to team-chat distribution land-grab)
-- [ ] Mobile/laptop views
+- [~] Mobile/laptop views (responsive dashboard: sticky reachable action bar, full-width touch targets, stacked cards on phone / multi-col on laptop). Testing on the iQOO over LAN BEFORE deploying.
 - [ ] Deploy + rehearse
+
+## Phone testing (do this BEFORE Vercel deploy)
+- Same Wi-Fi, open `http://192.168.1.139:3000` on the iQOO (LAN IP of this laptop; re-check if the network changes).
+- LAN HTTP is fine for testing all FUNCTIONALITY (sweep, cards, inject, toast). NOTE: full PWA install ("Add to Home Screen" app prompt + service worker) needs HTTPS — that only works after the Vercel deploy, not over LAN HTTP. So: validate behavior on the phone now; validate the installable PWA experience post-deploy.
+- If the phone can't connect, allow Node through Windows Firewall (inbound TCP 3000) — the dev server binds to all interfaces by default.
 
 ## Current implementation map (keep this current)
 - `src/lib/agents.js` — 4 system prompts + `MODELS` (analysts: `anthropic/claude-3.5-haiku`, Strategy: `anthropic/claude-sonnet-4.5`) + `ANALYSTS`/`STRATEGY` configs.
