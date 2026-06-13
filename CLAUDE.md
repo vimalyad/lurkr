@@ -194,3 +194,9 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - `src/app/page.js` — idea form → discover competitors (editable list) → "Run Intelligence Sweep" = gather live signals (`/api/gather`) → 3 analysts in parallel (each grounded in its bucket) → Strategy. Shows gathering status + per-bucket signal counts. Client orchestration keeps the multi-agent flow VISIBLE.
 - REMOVED in M6: `src/lib/seed.js`, `src/app/api/injected/route.js` (demo-only). `seed-data.json` kept as reference only. Toast/live-flash keyframes remain in `globals.css` (unused for now; may return as M8 alerts).
 - Local dev: `npm run dev` (:3000), LAN-reachable (`allowedDevOrigins` in `next.config.mjs`). `.env.local` holds `OPENROUTER_API_KEY` (gitignored; overrides `.env`).
+
+## Prompt optimization (APO) — M9
+- `scripts/optimize-prompts.mjs` — offline OPRO-style optimizer for the analyst prompts. For an agent it: evaluates the current ("seed") prompt on fixed eval cases → scores each output with an LLM-as-judge (rubric: grounding in signals, specificity, relevance to the user's idea, schema validity) → an optimizer LLM proposes a better prompt from the scored history → loops, keeps the best. Writes `scripts/optimized-prompts.json` (winners + score history).
+- Run: `node scripts/optimize-prompts.mjs [marketing|product|sales|all] [rounds]` (reads `OPENROUTER_API_KEY` from `.env.local`).
+- The MARKETING/PRODUCT/SALES prompts in `src/lib/agents.js` are now the APO-tuned winners (judge scores: marketing 72→78, product 75→80, sales 58.5→75). To re-optimize: re-run and copy the new winners back into `agents.js`.
+- It is purely OFFLINE — not in the request path, and it never mutates the live app automatically (human reviews/copies winners). Metric is a small LLM-judged sample, so treat small deltas as noise.
