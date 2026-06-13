@@ -17,7 +17,29 @@ competitors and surface threats/opportunities, presented in a unified dashboard 
 Tagline: *Lurkr — always watching, never blinking. The intelligence team that never sleeps.*
 Pitch: always-on intelligence team for startups/SMBs that don't have a market research team.
 
-## Hard constraints (DO NOT VIOLATE)
+## ⚠️ CURRENT DIRECTION — real-data product (supersedes the hackathon-demo sections below)
+The hackathon demo (milestones 1–5) is built and working. We are now turning Lurkr into a REAL product.
+The demo-era sections below (hard constraints, seed-data, inject money-shot, hour-by-hour plan) are
+HISTORICAL — keep them for context but they no longer govern the build.
+
+New product vision: a user describes THEIR OWN startup/idea + features → Lurkr discovers the real
+competitors in that space → gathers data on them → feeds competitors + the user's idea to the agents →
+personalized THREAT/OPPORTUNITY analysis for the user's product.
+
+New flow: `[idea form] → /api/discover (LLM finds real competitors) → analysts analyze (idea-aware) →
+Strategy writes a personalized brief`. Decisions locked: dynamic targets (discovered, not hardcoded);
+**hybrid** data (structured APIs + web search); backend **Neon (Postgres) + GitHub Actions** (scheduling).
+
+Roadmap:
+- M6 (DONE) — idea input + discovery + idea-aware analysis. Keyless: analysts reason from LLM knowledge.
+- M7 — live data (hybrid): Tavily/Brave web search + Google News RSS + app-store/play reviews + best-effort
+  job boards (Greenhouse/Lever). Needs a free `TAVILY_API_KEY` (or Brave). This GROUNDS the analysis in fresh signals.
+- M8 — Neon persistence (store signals/findings/briefs, detect new) + GitHub Actions cron re-sweeps + Resend email alerts.
+
+The lifted demo constraints: real DB, real data gathering, and scheduling ARE now in scope (they were only
+out of scope for the judged demo).
+
+## Hard constraints (DO NOT VIOLATE)  ← HISTORICAL (demo-era; see CURRENT DIRECTION above)
 - **~10 hours, solo dev, strong full-stack.** Ruthless scope. Build ONLY what appears on screen in the demo.
 - **No native app.** Build a **PWA** (Next.js + manifest + icon, "Add to Home Screen"). Phone has NO debugging mode, so no ADB/APK/native toolchain.
 - **Phone is demo-only** (iQOO). Code lives on laptop, deploy to Vercel, open URL on phone via Add-to-Home-Screen.
@@ -149,18 +171,22 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - [x] Alert money-shot (Inject Live Signal -> re-synthesize -> THREAT toast; verified escalation to team-chat distribution land-grab)
 - [x] Mobile/laptop views (responsive dashboard; verified live on the iQOO over LAN)
 - [~] Deploy + rehearse (demo script written in DEMO.md; Vercel deploy pending — needs the user's Vercel account + OPENROUTER_API_KEY env var set in Vercel)
+- --- REAL-DATA PIVOT ---
+- [x] M6 — Idea input + competitor discovery + idea-aware analysis (verified end-to-end: idea -> 5 real competitors -> analysts -> personalized brief; keyless, LLM-knowledge based)
+- [ ] M7 — Live data (hybrid: Tavily/Brave search + Google News RSS + app-store/play reviews + Greenhouse/Lever jobs). Needs TAVILY_API_KEY.
+- [ ] M8 — Neon persistence + GitHub Actions scheduling + Resend email alerts
 
 ## Phone testing (do this BEFORE Vercel deploy)
 - Same Wi-Fi, open `http://192.168.1.139:3000` on the iQOO (LAN IP of this laptop; re-check if the network changes).
 - LAN HTTP is fine for testing all FUNCTIONALITY (sweep, cards, inject, toast). NOTE: full PWA install ("Add to Home Screen" app prompt + service worker) needs HTTPS — that only works after the Vercel deploy, not over LAN HTTP. So: validate behavior on the phone now; validate the installable PWA experience post-deploy.
 - If the phone can't connect, allow Node through Windows Firewall (inbound TCP 3000) — the dev server binds to all interfaces by default.
 
-## Current implementation map (keep this current)
-- `src/lib/agents.js` — 4 system prompts + `MODELS` (analysts: `anthropic/claude-3.5-haiku`, Strategy: `anthropic/claude-sonnet-4.5`) + `ANALYSTS`/`STRATEGY` configs.
+## Current implementation map (keep this current) — post-M6
+- `src/lib/agents.js` — `MODELS` (analysts: `anthropic/claude-3.5-haiku`; Strategy + Discovery: `anthropic/claude-sonnet-4.5`). `DISCOVERY` + idea-aware `ANALYSTS` + `STRATEGY` prompts. Analysts take `{your_idea, your_features, competitors}`.
 - `src/lib/openrouter.js` — `runAgent()`: OpenRouter call, try/catch + 1 retry, `parseJsonLoose()` strips ```json fences (the Strategy model wraps JSON in fences despite `response_format`).
-- `src/lib/seed.js` — imports `seed-data.json`.
-- `src/app/api/agent/[id]/route.js` — GET, runs ONE analyst (marketing/product/sales) against its seed slice.
-- `src/app/api/strategy/route.js` — POST `{marketing, product, sales, injected?}`, returns the brief.
-- `src/app/api/injected/route.js` — GET, returns `seed.injected_signal` (the held-back live signal).
-- `src/app/page.js` — dashboard. Client orchestrates the pipeline: fires the 3 analysts in parallel (`Promise.all`), each card flips idle->analyzing->done as it resolves, then POSTs all three to Strategy. This client-side orchestration is what makes the multi-agent flow VISIBLE. After a sweep, the "⚡ Inject Live Signal" button drops the held-back signal onto the Sales agent (red live-flash card), re-synthesizes Strategy with `injected`, and fires the THREAT `Toast`. Toast/live-flash keyframes live in `globals.css`.
-- Local dev: `npm run dev` (default :3000). `.env.local` holds the real `OPENROUTER_API_KEY` (gitignored; it overrides `.env`).
+- `src/app/api/discover/route.js` — POST `{idea, features}` → `{space, competitors:[{name,website,description,why_relevant}]}`.
+- `src/app/api/agent/[id]/route.js` — POST `{idea, features, competitors}`, runs ONE analyst over the competitors.
+- `src/app/api/strategy/route.js` — POST `{idea, features, marketing, product, sales}` → personalized brief.
+- `src/app/page.js` — idea form → discover competitors (editable list) → "Run Intelligence Sweep" fires the 3 analysts in parallel, then Strategy. Client orchestration keeps the multi-agent flow VISIBLE.
+- REMOVED in M6: `src/lib/seed.js`, `src/app/api/injected/route.js` (demo-only). `seed-data.json` kept as reference only. Toast/live-flash keyframes remain in `globals.css` (unused for now; may return as M8 alerts).
+- Local dev: `npm run dev` (:3000), LAN-reachable (`allowedDevOrigins` in `next.config.mjs`). `.env.local` holds `OPENROUTER_API_KEY` (gitignored; overrides `.env`).

@@ -1,6 +1,5 @@
-// Strategy route — the demo-winner. Receives the three analysts' findings (and optionally
-// a live-injected signal) and synthesizes them into a weekly executive brief: the single
-// biggest THREAT and OPPORTUNITY, each tied to evidence with a recommended action.
+// Strategy route — synthesizes the three analysts' findings into a personalized brief for
+// the user's own product: the single biggest THREAT and OPPORTUNITY, each with an action.
 import { NextResponse } from "next/server";
 import { runAgent } from "@/lib/openrouter";
 import { STRATEGY } from "@/lib/agents";
@@ -15,7 +14,7 @@ export async function POST(req) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // body = { marketing: [...], product: [...], sales: [...], injected?: {...} }
+  // body = { idea, features, marketing:[...], product:[...], sales:[...] }
   try {
     const result = await runAgent({
       model: STRATEGY.model,
