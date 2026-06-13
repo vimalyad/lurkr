@@ -53,6 +53,8 @@ export default function Home() {
   const [agents, setAgents] = useState(initialAgentState);
   const [strategy, setStrategy] = useState({ status: "idle", brief: null });
   const [sweeping, setSweeping] = useState(false);
+  const [gathering, setGathering] = useState(false);
+  const [signalCounts, setSignalCounts] = useState(null);
   const [error, setError] = useState(null);
 
   const setAgent = (id, patch) =>
@@ -94,9 +96,32 @@ export default function Home() {
     if (!hasCompetitors) return;
     setSweeping(true);
     setError(null);
+    setSignalCounts(null);
     setStrategy({ status: "idle", brief: null });
     setAgents(initialAgentState());
 
+    // 0) Gather live signals for the competitors (web + news), bucketed per analyst.
+    setGathering(true);
+    let buckets = { marketing: [], product: [], sales: [] };
+    try {
+      const gres = await fetch("/api/gather", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ competitors }),
+      });
+      const gdata = await gres.json();
+      if (!gdata.ok) throw new Error(gdata.error || "Gather failed");
+      buckets = { marketing: gdata.marketing, product: gdata.product, sales: gdata.sales };
+      setSignalCounts(gdata.counts || null);
+    } catch (err) {
+      setError(String(err.message || err));
+      setGathering(false);
+      setSweeping(false);
+      return;
+    }
+    setGathering(false);
+
+    // 1) Analysts in parallel, each grounded in its live signal bucket.
     ANALYSTS.forEach((a) => setAgent(a.id, { status: "analyzing", findings: [] }));
 
     const results = await Promise.all(
@@ -105,7 +130,7 @@ export default function Home() {
           const res = await fetch(`/api/agent/${a.id}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idea, features, competitors }),
+            body: JSON.stringify({ idea, features, competitors, signals: buckets[a.id] }),
           });
           const data = await res.json();
           if (!data.ok) throw new Error(data.error || `${a.label} failed`);
@@ -195,13 +220,26 @@ export default function Home() {
       {hasCompetitors && (
         <section className="mt-5">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Competitors found ({competitors.length})</h2>
+            <div>
+              <h2 className="font-semibold">Competitors found ({competitors.length})</h2>
+              {gathering && (
+                <p className="text-xs text-amber-400 mt-0.5 animate-pulse">
+                  Gathering live signals (web + news)…
+                </p>
+              )}
+              {!gathering && signalCounts && (
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  live signals — marketing {signalCounts.marketing} · product{" "}
+                  {signalCounts.product} · sales {signalCounts.sales}
+                </p>
+              )}
+            </div>
             <button
               onClick={runSweep}
               disabled={sweeping}
               className="rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 px-5 py-2.5 text-sm font-semibold transition-colors"
             >
-              {sweeping ? "Sweeping…" : "Run Intelligence Sweep"}
+              {gathering ? "Gathering…" : sweeping ? "Analyzing…" : "Run Intelligence Sweep"}
             </button>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
