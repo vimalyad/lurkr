@@ -176,7 +176,9 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - [x] M6 — Idea input + competitor discovery + idea-aware analysis (verified end-to-end: idea -> 5 real competitors -> analysts -> personalized brief; keyless, LLM-knowledge based)
 - [x] M7 — Live data (hybrid): Tavily web search (all buckets) + Google News RSS (sales recency). `/api/gather` collects bucketed signals per competitor; analysts now ground findings in them. Verified: real funding/hiring/Trustpilot signals cited in findings. TAVILY_API_KEY set in `.env.local`.
 - [ ] M7.5 (optional) — structured sources where resolvable: Greenhouse/Lever job APIs, app-store/play review scrapers.
-- [ ] M8 — Neon persistence + GitHub Actions scheduling + Resend email alerts
+- [x] M8 — Design overhaul: "intelligence terminal / surveillance dossier" aesthetic (built via the frontend-design skill).
+- [ ] M9 — Automatic Prompt Optimization harness (offline OPRO/judge loop to improve the agent prompts).
+- [ ] M10 — Neon persistence + GitHub Actions scheduling + Resend email alerts
 
 ## Phone testing (do this BEFORE Vercel deploy)
 - Same Wi-Fi, open `http://192.168.1.139:3000` on the iQOO (LAN IP of this laptop; re-check if the network changes).
@@ -193,4 +195,5 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - `src/app/api/strategy/route.js` — POST `{idea, features, marketing, product, sales}` → personalized brief.
 - `src/app/page.js` — idea form → discover competitors (editable list) → "Run Intelligence Sweep" = gather live signals (`/api/gather`) → 3 analysts in parallel (each grounded in its bucket) → Strategy. Shows gathering status + per-bucket signal counts. Client orchestration keeps the multi-agent flow VISIBLE.
 - REMOVED in M6: `src/lib/seed.js`, `src/app/api/injected/route.js` (demo-only). `seed-data.json` kept as reference only. Toast/live-flash keyframes remain in `globals.css` (unused for now; may return as M8 alerts).
-- Local dev: `npm run dev` (:3000), LAN-reachable (`allowedDevOrigins` in `next.config.mjs`). `.env.local` holds `OPENROUTER_API_KEY` (gitignored; overrides `.env`).
+- Design system (M8): dark "intelligence terminal" aesthetic. Fonts via `next/font` in `layout.js` — Instrument Serif (display), Hanken Grotesk (body), JetBrains Mono (data/labels), exposed as Tailwind `font-serif`/`font-sans`/`font-mono` through `@theme inline` in `globals.css`. Amber signal accent `--color-signal: #f5b544` + semantic red/green. Atmosphere (grid + amber wash + grain + vignette) via `body::before/::after`; `.panel`, `.label`, `.reveal`, `.watch-dot/.watch-ring` component/anim classes in `globals.css`.
+- Local dev: `npm run dev` (:3000), LAN-reachable (`allowedDevOrigins` in `next.config.mjs`). `.env.local` holds `OPENROUTER_API_KEY` + `TAVILY_API_KEY` (gitignored; overrides `.env`).
