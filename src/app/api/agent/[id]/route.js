@@ -21,7 +21,7 @@ export async function POST(req, { params }) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { idea, features, competitors } = body || {};
+  const { idea, features, competitors, signals } = body || {};
   if (!Array.isArray(competitors) || competitors.length === 0) {
     return NextResponse.json({ ok: false, error: "No competitors to analyze." }, { status: 400 });
   }
@@ -30,7 +30,12 @@ export async function POST(req, { params }) {
     const result = await runAgent({
       model: agent.model,
       system: agent.system,
-      user: JSON.stringify({ your_idea: idea || "", your_features: features || "", competitors }),
+      user: JSON.stringify({
+        your_idea: idea || "",
+        your_features: features || "",
+        competitors,
+        signals: Array.isArray(signals) ? signals : [],
+      }),
     });
     return NextResponse.json({ agent: id, ok: true, findings: result.findings ?? [] });
   } catch (err) {
