@@ -64,7 +64,8 @@ out of scope for the judged demo).
   then Strategy visibly CONSUMES the three cards and produces the brief.
 - Judges must SEE agents feeding each other. Invisible orchestration looks like one chatbot.
 
-## Agent prompts (each returns ONLY JSON, no markdown; guard parse with try/catch + 1 retry)
+## Agent prompts  ← HISTORICAL (demo-era seed prompts). LIVE prompts now live in `src/lib/agents.js` and are idea-aware + signal-grounded.
+(each returns ONLY JSON, no markdown; guard parse with try/catch + 1 retry)
 
 ### Marketing AI  — input: marketing_signals from seed-data.json
 "You are a marketing intelligence analyst. From the provided competitor marketing signals, identify
@@ -156,7 +157,7 @@ const data = await res.json();
 const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 ```
 
-## Suggested first commands in this Claude Code session
+## Suggested first commands  ← HISTORICAL (initial hackathon scaffolding prompts; the app is long since scaffolded)
 1. "Read CLAUDE.md and seed-data.json fully. Then scaffold the Next.js PWA (manifest + icon + Add-to-Home-Screen),
    wire in seed-data.json, and create the 4 agent prompt files per the 0:00-1:00 plan. Get ONE agent
    (Marketing) returning real JSON from the seed data end-to-end before building anything else."
