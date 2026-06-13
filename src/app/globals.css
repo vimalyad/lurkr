@@ -1,40 +1,119 @@
 @import "tailwindcss";
 
+@theme inline {
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jet), ui-monospace, "SFMono-Regular", monospace;
+  --color-signal: #f5b544;
+  --color-ink: #ece9e2;
+}
+
 :root {
   color-scheme: dark;
 }
 
-html,
-body {
-  background: #0a0a0f;
-  color: #e7e7ea;
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
-@keyframes toast-in {
+html,
+body {
+  background: #0a0a0b;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* ── Atmosphere: amber wash + faint grid, vignetted, with a grain overlay ───── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(245, 181, 68, 0.08), transparent 55%),
+    linear-gradient(to right, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 100% 100%, 46px 46px, 46px 46px;
+  -webkit-mask-image: radial-gradient(135% 100% at 50% 0%, #000 30%, transparent 78%);
+  mask-image: radial-gradient(135% 100% at 50% 0%, #000 30%, transparent 78%);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────────── */
+@keyframes reveal {
   from {
     opacity: 0;
-    transform: translate(-50%, -16px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: none;
   }
 }
-
-.animate-toast-in {
-  animation: toast-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+.reveal {
+  animation: reveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes live-flash {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+@keyframes watch-blink {
+  0%, 100% {
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.25);
+    opacity: 0.3;
   }
 }
+.watch-dot {
+  animation: watch-blink 1.6s ease-in-out infinite;
+}
 
-.animate-live-flash {
-  animation: live-flash 1.4s ease-in-out 3;
+@keyframes watch-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+.watch-ring {
+  animation: watch-ring 1.8s ease-out infinite;
+}
+
+/* ── Components ──────────────────────────────────────────────────────────────── */
+.panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8d8a82;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+textarea {
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: rgba(245, 181, 68, 0.28);
 }
