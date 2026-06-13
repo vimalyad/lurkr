@@ -145,8 +145,8 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - [x] Seed data generated (seed-data.json)
 - [x] Scaffold + one agent working end-to-end (Next.js 16 PWA + Marketing AI returning real JSON via OpenRouter)
 - [x] Full 4-agent pipeline (parallel analysts -> Strategy synthesis; verified the Recapio-threat / Klarith-opportunity punchline)
-- [~] Dashboard UI (functional dashboard shipped with the pipeline; polish pass still pending)
-- [ ] Alert money-shot
+- [~] Dashboard UI (functional + styled dashboard shipped; deeper polish optional)
+- [x] Alert money-shot (Inject Live Signal -> re-synthesize -> THREAT toast; verified escalation to team-chat distribution land-grab)
 - [ ] Mobile/laptop views
 - [ ] Deploy + rehearse
 
@@ -156,5 +156,6 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - `src/lib/seed.js` — imports `seed-data.json`.
 - `src/app/api/agent/[id]/route.js` — GET, runs ONE analyst (marketing/product/sales) against its seed slice.
 - `src/app/api/strategy/route.js` — POST `{marketing, product, sales, injected?}`, returns the brief.
-- `src/app/page.js` — dashboard. Client orchestrates the pipeline: fires the 3 analysts in parallel (`Promise.all`), each card flips idle->analyzing->done as it resolves, then POSTs all three to Strategy. This client-side orchestration is what makes the multi-agent flow VISIBLE.
+- `src/app/api/injected/route.js` — GET, returns `seed.injected_signal` (the held-back live signal).
+- `src/app/page.js` — dashboard. Client orchestrates the pipeline: fires the 3 analysts in parallel (`Promise.all`), each card flips idle->analyzing->done as it resolves, then POSTs all three to Strategy. This client-side orchestration is what makes the multi-agent flow VISIBLE. After a sweep, the "⚡ Inject Live Signal" button drops the held-back signal onto the Sales agent (red live-flash card), re-synthesizes Strategy with `injected`, and fires the THREAT `Toast`. Toast/live-flash keyframes live in `globals.css`.
 - Local dev: `npm run dev` (default :3000). `.env.local` holds the real `OPENROUTER_API_KEY` (gitignored; it overrides `.env`).
