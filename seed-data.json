@@ -1,0 +1,153 @@
+{
+  "_README": "Seed data for MarketWatch demo. ALL company names are fictional. Signals are deliberately INTERCONNECTED so the Strategy agent can connect dots into a non-obvious threat + opportunity. Feed marketing_signals -> Marketing AI, product_signals -> Product AI, sales_signals -> Sales AI. Hold injected_signal back and add it live during the demo to fire the THREAT alert.",
+
+  "your_company": {
+    "name": "Synapse",
+    "category": "AI meeting-notes & team knowledge SaaS",
+    "positioning": "Premium, mobile-first AI notetaker for fast-moving teams",
+    "primary_segment": "mid-market teams (20-200 people)",
+    "pricing": "Premium per-seat, no free tier"
+  },
+
+  "competitors": ["Recapio", "Klarith", "Driftwave"],
+
+  "marketing_signals": [
+    {
+      "id": "mkt-01",
+      "competitor": "Recapio",
+      "date": "2026-06-02",
+      "content": "Launched a new brand campaign: 'Recapio for Everyone — powerful AI meeting notes, now free for small teams.' Heavy spend on YouTube and LinkedIn. Messaging shifted away from 'enterprise-grade' toward 'simple, free, for any team.'"
+    },
+    {
+      "id": "mkt-02",
+      "competitor": "Recapio",
+      "date": "2026-06-09",
+      "content": "Homepage rewritten. Old hero: 'Enterprise meeting intelligence.' New hero: 'Free forever for teams under 10.' Pricing page now leads with the free tier."
+    },
+    {
+      "id": "mkt-03",
+      "competitor": "Klarith",
+      "date": "2026-05-28",
+      "content": "Campaign focused entirely on enterprise: 'Klarith — meeting intelligence for the boardroom.' All creative is desktop screenshots and laptop scenes. No mention of mobile anywhere in ads."
+    },
+    {
+      "id": "mkt-04",
+      "competitor": "Klarith",
+      "date": "2026-06-07",
+      "content": "Webinar series 'Klarith for Compliance Teams' — doubling down on regulated-industry, desktop-bound enterprise buyers."
+    },
+    {
+      "id": "mkt-05",
+      "competitor": "Driftwave",
+      "date": "2026-06-05",
+      "content": "Ran a small seasonal promo: '15% off annual plans this month.' No change in positioning or messaging. Routine discounting."
+    },
+    {
+      "id": "mkt-06",
+      "competitor": "Recapio",
+      "date": "2026-06-11",
+      "content": "Influencer push: dozens of small-business and creator accounts posting 'Recapio is free now' content. Clearly a coordinated self-serve, bottoms-up acquisition motion."
+    }
+  ],
+
+  "product_signals": [
+    {
+      "id": "prd-01",
+      "competitor": "Recapio",
+      "date": "2026-06-03",
+      "content": "Recent reviews trending very positive on ease-of-use and onboarding: 'set up in two minutes,' 'my whole team adopted it instantly.' Sentiment clearly positive."
+    },
+    {
+      "id": "prd-02",
+      "competitor": "Recapio",
+      "date": "2026-06-08",
+      "content": "A minority of reviews note it lacks deep enterprise controls (SSO, granular admin, audit logs). But these complaints are from larger orgs — small teams don't care and rate it highly."
+    },
+    {
+      "id": "prd-03",
+      "competitor": "Klarith",
+      "date": "2026-05-30",
+      "content": "Loud, repeated complaints across reviews about the mobile experience: 'no real mobile app,' 'the phone version is unusable,' 'I can't review notes on the go.' Top feature request by volume is a proper native mobile app."
+    },
+    {
+      "id": "prd-04",
+      "competitor": "Klarith",
+      "date": "2026-06-06",
+      "content": "More mobile complaints: 'great on desktop, useless when I'm traveling.' Users explicitly say they'd switch to a competitor with strong mobile. Desktop sentiment positive, mobile sentiment very negative."
+    },
+    {
+      "id": "prd-05",
+      "competitor": "Klarith",
+      "date": "2026-06-10",
+      "content": "Feature-request board shows 'native iOS/Android app' as the #1 most-upvoted request for two quarters running, still marked 'not planned.'"
+    },
+    {
+      "id": "prd-06",
+      "competitor": "Driftwave",
+      "date": "2026-06-04",
+      "content": "Mixed but stable reviews. Some praise, some minor gripes about export formats. Nothing trending, no major theme emerging."
+    },
+    {
+      "id": "prd-07",
+      "competitor": "Recapio",
+      "date": "2026-06-12",
+      "content": "Reviewers increasingly mention 'switched from a paid tool because Recapio is free and good enough.' Several name premium competitors they churned away from."
+    }
+  ],
+
+  "sales_signals": [
+    {
+      "id": "sal-01",
+      "competitor": "Recapio",
+      "date": "2026-06-01",
+      "content": "Announced a $40M Series B led by a growth fund known for backing freemium, product-led-growth companies. Press release emphasizes 'capturing the long tail of small teams.'"
+    },
+    {
+      "id": "sal-02",
+      "competitor": "Recapio",
+      "date": "2026-06-09",
+      "content": "Hiring surge: 12 new open roles, almost all in 'self-serve growth,' 'SMB / velocity sales,' and 'lifecycle marketing.' No enterprise-AE roles. Clear bet on high-volume, low-touch SMB acquisition."
+    },
+    {
+      "id": "sal-03",
+      "competitor": "Recapio",
+      "date": "2026-06-10",
+      "content": "Opened a new APAC entity and posted roles in Singapore and Bangalore for regional self-serve growth — geographic expansion of the SMB land-grab."
+    },
+    {
+      "id": "sal-04",
+      "competitor": "Klarith",
+      "date": "2026-06-02",
+      "content": "Hiring exclusively enterprise field sales and solutions engineers. Roles are all desktop/web platform focused. Zero mobile-engineering hires posted."
+    },
+    {
+      "id": "sal-05",
+      "competitor": "Klarith",
+      "date": "2026-06-08",
+      "content": "Signed a large public-sector contract (announced via case study). Doubling down on big, slow, desktop-bound enterprise deals."
+    },
+    {
+      "id": "sal-06",
+      "competitor": "Driftwave",
+      "date": "2026-06-06",
+      "content": "No notable funding, hiring, or expansion activity this period. Headcount flat. Quiet."
+    }
+  ],
+
+  "injected_signal": {
+    "id": "inject-LIVE",
+    "competitor": "Recapio",
+    "agent": "sales",
+    "urgency": "high",
+    "date": "2026-06-14",
+    "content": "BREAKING: Recapio just announced a partnership making it the default meeting-notes integration inside a major team-chat platform, pushing its free tier to that platform's entire user base. This is a distribution land-grab aimed straight at the mid-market.",
+    "_demo_note": "Add this live during the demo (after the first sweep) to fire the THREAT alert. It escalates the Recapio down-market threat from 'emerging' to 'urgent' by adding mass distribution to the free-tier + funding + SMB-hiring pattern."
+  },
+
+  "_expected_strategy_output": {
+    "_note": "This is the punchline the seed data is engineered to produce — do NOT hardcode it, but use it to sanity-check that the Strategy agent connects the dots.",
+    "threat": "Recapio is executing a funded, deliberate down-market land-grab: $40M raised + SMB/self-serve hiring + APAC expansion + a 'free for small teams' campaign + reviewers churning from paid tools. They're coming for Synapse's mid-market from below. Action: defend the mid-market with clear premium value and a small-team on-ramp before the free tier erodes it.",
+    "opportunity": "Klarith — a strong enterprise competitor — has a glaring, loudly-requested mobile gap (#1 feature request for two quarters, marked 'not planned,' users threatening to switch) while hiring zero mobile engineers. Synapse is mobile-first. Action: target Klarith's frustrated mobile users with a switch campaign; this is an open flank.",
+    "distractor": "Driftwave is noise this period — flat on all fronts. Correctly de-prioritized."
+  }
+}
