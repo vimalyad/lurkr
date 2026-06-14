@@ -128,6 +128,29 @@ table above in the Render dashboard. It auto-deploys on push to `main`.
   GitHub repo secrets and the Render env.
 - **Usage** is logged to `usage_events` (no billing yet — groundwork for usage-based pricing).
 
+### Google sign-in setup
+
+We use the **Google Identity Services ID-token flow**, so **no client secret is involved
+anywhere** — only the OAuth **client ID**.
+
+1. Google Cloud Console → APIs & Services → Credentials → **Create OAuth client ID** →
+   *Web application*.
+2. Add **Authorized JavaScript origins**:
+   - `https://vimalyad.github.io` (the hosted frontend)
+   - `http://localhost:5173` (local dev)
+3. Use the **Client ID** in two places (the same value):
+   - `GOOGLE_CLIENT_ID` — backend env (Render). Used only to check the ID-token audience.
+   - `VITE_GOOGLE_CLIENT_ID` — build-time env (GitHub secret). Renders the sign-in button.
+
+The client **secret is not used** and should not be added to Render, GitHub, or `.env` — the
+browser receives a signed ID token (`response.credential`) which the backend verifies against
+Google's `tokeninfo` endpoint. A secret would only be needed for the server-side
+authorization-code flow, which we don't use.
+
+> ⚠️ Google often blocks OAuth inside embedded WebViews. Google sign-in works in a browser at
+> the Pages URL; **inside the installed APK, prefer email/password.** Native Google sign-in
+> would need a Capacitor plugin + APK rebuild.
+
 ## Android app — automated, build-once
 
 The APK is a thin shell: it loads the **live frontend from GitHub Pages**
