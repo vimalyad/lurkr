@@ -29,7 +29,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci
+      - run: npm install
 
       # Bake in the hosted backend URL, and build under the /lurkr/ Pages subpath.
       - name: Build

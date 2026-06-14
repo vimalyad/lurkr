@@ -128,6 +128,37 @@ table above in the Render dashboard. It auto-deploys on push to `main`.
   GitHub repo secrets and the Render env.
 - **Usage** is logged to `usage_events` (no billing yet — groundwork for usage-based pricing).
 
+### Google sign-in setup
+
+We use the **Google Identity Services ID-token flow**, so **no client secret is involved
+anywhere** — only the OAuth **client ID**.
+
+1. Google Cloud Console → APIs & Services → Credentials → **Create OAuth client ID** →
+   *Web application*.
+2. Add **Authorized JavaScript origins**:
+   - `https://vimalyad.github.io` (the hosted frontend)
+   - `http://localhost:5173` (local dev)
+3. Use the **Client ID** in two places (the same value):
+   - `GOOGLE_CLIENT_ID` — backend env (Render). Used only to check the ID-token audience.
+   - `VITE_GOOGLE_CLIENT_ID` — build-time env (GitHub secret). Renders the sign-in button.
+
+The client **secret is not used** and should not be added to Render, GitHub, or `.env` — the
+browser receives a signed ID token (`response.credential`) which the backend verifies against
+Google's `tokeninfo` endpoint. A secret would only be needed for the server-side
+authorization-code flow, which we don't use.
+
+**Native (APK) Google sign-in.** Google blocks its web sign-in inside Android WebViews, so the
+app uses native sign-in via `@capgo/capacitor-social-login` (the Android account picker); the web
+build keeps the GIS button. This needs a **second OAuth client of type _Android_** in Google
+Cloud, registered with the package name and the release signing-cert SHA-1:
+- Package: `com.lurkr.app`
+- SHA-1 (release keystore): `openssl pkcs12 -in lurkr-release.p12 -nokeys | openssl x509 -noout -fingerprint -sha1`
+
+The **Web** client ID stays the single source of truth — it is the plugin's `webClientId`, and the
+backend still verifies every token's audience against it (`GOOGLE_CLIENT_ID`). The Android client
+exists only so Google issues a token to the app; its own ID isn't referenced in code. The native
+plugin requires `minSdkVersion 24`.
+
 ## Android app — automated, build-once
 
 The APK is a thin shell: it loads the **live frontend from GitHub Pages**
