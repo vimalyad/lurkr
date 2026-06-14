@@ -1,0 +1,497 @@
+import { useState, useCallback, useEffect } from "react";
+import { api } from "./lib/api.js";
+import lurkrIcon from "./assets/lurkr-icon.png";
+
+// ── Agent presentation config ────────────────────────────────────────────────
+const ANALYSTS = [
+  { id: "marketing", label: "Marketing", blurb: "positioning · campaigns · trends", headline: (f) => f.insight, tag: (f) => f.trend_direction, sub: (f) => f.signal },
+  { id: "product", label: "Product", blurb: "sentiment · complaints · gaps", headline: (f) => f.opportunity, tag: (f) => f.sentiment, sub: (f) => f.feature_gap || f.theme },
+  { id: "sales", label: "Sales", blurb: "funding · hiring · expansion", headline: (f) => f.buying_signal, tag: (f) => f.urgency, sub: (f) => f.detail },
+];
+
+const STATUS = {
+  idle: { dot: "bg-neutral-600", text: "text-neutral-500", word: "standby" },
+  analyzing: { dot: "bg-[var(--color-signal)] animate-pulse", text: "text-[var(--color-signal)]", word: "analyzing" },
+  done: { dot: "bg-emerald-400", text: "text-emerald-400", word: "complete" },
+  error: { dot: "bg-red-500", text: "text-red-400", word: "error" },
+};
+
+const initialAgentState = () => ({
+  marketing: { status: "idle", findings: [] },
+  product: { status: "idle", findings: [] },
+  sales: { status: "idle", findings: [] },
+});
+
+export default function Dashboard({ user, onSignOut }) {
+  const [view, setView] = useState("search"); // "search" | "ideas"
+
+  const [idea, setIdea] = useState("");
+  const [features, setFeatures] = useState("");
+  const [space, setSpace] = useState("");
+  const [competitors, setCompetitors] = useState([]);
+
+  const [step, setStep] = useState("product"); // "product" | "features" | "confirm"
+  const [confirmed, setConfirmed] = useState(false);
+
+  const [discovering, setDiscovering] = useState(false);
+  const [agents, setAgents] = useState(initialAgentState);
+  const [strategy, setStrategy] = useState({ status: "idle", brief: null });
+  const [sweeping, setSweeping] = useState(false);
+  const [gathering, setGathering] = useState(false);
+  const [signalCounts, setSignalCounts] = useState(null);
+  const [error, setError] = useState(null);
+
+  // The saved idea backing the current view (for the daily-refresh toggle).
+  const [currentIdea, setCurrentIdea] = useState(null); // { id, daily_refresh, source, run_at }
+
+  const [ideas, setIdeas] = useState([]);
+  const [ideasLoading, setIdeasLoading] = useState(false);
+
+  const setAgent = (id, patch) => setAgents((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  const hasCompetitors = competitors.length > 0;
+
+  const resetResults = () => {
+    setCompetitors([]); setSpace(""); setSignalCounts(null);
+    setStrategy({ status: "idle", brief: null }); setAgents(initialAgentState());
+    setCurrentIdea(null);
+  };
+
+  const discover = useCallback(async () => {
+    if (!idea.trim()) return;
+    setDiscovering(true); setError(null); resetResults();
+    try {
+      const data = await api("/api/discover", { method: "POST", body: { idea, features } });
+      setSpace(data.space);
+      setCompetitors(data.competitors);
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setDiscovering(false);
+    }
+  }, [idea, features]);
+
+  const removeCompetitor = (i) => setCompetitors((prev) => prev.filter((_, idx) => idx !== i));
+
+  const confirmAndDiscover = useCallback(() => { setConfirmed(true); discover(); }, [discover]);
+  const editIntake = useCallback(() => { setConfirmed(false); setStep("product"); }, []);
+
+  const runSweep = useCallback(async () => {
+    if (!hasCompetitors) return;
+    setSweeping(true); setError(null); setSignalCounts(null);
+    setStrategy({ status: "idle", brief: null }); setAgents(initialAgentState());
+
+    // 0) Gather live signals.
+    setGathering(true);
+    let buckets = { marketing: [], product: [], sales: [] };
+    let counts = null;
+    try {
+      const gdata = await api("/api/gather", { method: "POST", body: { competitors } });
+      buckets = { marketing: gdata.marketing, product: gdata.product, sales: gdata.sales };
+      counts = gdata.counts || null;
+      setSignalCounts(counts);
+    } catch (err) {
+      setError(String(err.message || err)); setGathering(false); setSweeping(false); return;
+    }
+    setGathering(false);
+
+    // 1) Analysts in parallel.
+    ANALYSTS.forEach((a) => setAgent(a.id, { status: "analyzing", findings: [] }));
+    const results = await Promise.all(
+      ANALYSTS.map(async (a) => {
+        try {
+          const data = await api(`/api/agent/${a.id}`, { method: "POST", body: { idea, features, competitors, signals: buckets[a.id] } });
+          setAgent(a.id, { status: "done", findings: data.findings });
+          return [a.id, data.findings];
+        } catch (err) {
+          setAgent(a.id, { status: "error", findings: [] });
+          throw err;
+        }
+      })
+    ).catch((err) => { setError(String(err.message || err)); return null; });
+    if (!results) { setSweeping(false); return; }
+
+    // 2) Strategy synthesis (also persisted server-side under the user's idea).
+    setStrategy({ status: "analyzing", brief: null });
+    try {
+      const data = await api("/api/strategy", {
+        method: "POST",
+        body: { idea, features, space, competitors, counts, ...Object.fromEntries(results) },
+      });
+      setStrategy({ status: "done", brief: data });
+      if (data.ideaId) {
+        try {
+          const detail = await api(`/api/ideas/${data.ideaId}`);
+          setCurrentIdea({ id: data.ideaId, daily_refresh: detail.idea.daily_refresh, source: "live", run_at: detail.analysis?.run_at });
+        } catch { setCurrentIdea({ id: data.ideaId, daily_refresh: false, source: "live" }); }
+      }
+    } catch (err) {
+      setStrategy({ status: "error", brief: null }); setError(String(err.message || err));
+    } finally {
+      setSweeping(false);
+    }
+  }, [idea, features, competitors, space, hasCompetitors]);
+
+  // ── My Ideas ───────────────────────────────────────────────────────────────
+  const loadIdeas = useCallback(async () => {
+    setIdeasLoading(true);
+    try {
+      const data = await api("/api/ideas");
+      setIdeas(data.ideas || []);
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setIdeasLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { if (view === "ideas") loadIdeas(); }, [view, loadIdeas]);
+
+  // Serve the cached (possibly stale) analysis for a saved idea.
+  const openIdea = useCallback(async (id) => {
+    setError(null);
+    try {
+      const { idea: row, analysis } = await api(`/api/ideas/${id}`);
+      setIdea(row.idea); setFeatures(row.features || ""); setSpace(row.space || "");
+      setConfirmed(true); setView("search");
+      setCurrentIdea({ id: row.id, daily_refresh: row.daily_refresh, source: analysis?.source, run_at: analysis?.run_at });
+      if (analysis) {
+        setCompetitors(analysis.competitors || []);
+        setSignalCounts(analysis.counts || null);
+        setAgents({
+          marketing: { status: "done", findings: analysis.agents?.marketing || [] },
+          product: { status: "done", findings: analysis.agents?.product || [] },
+          sales: { status: "done", findings: analysis.agents?.sales || [] },
+        });
+        setStrategy({ status: "done", brief: analysis.brief || null });
+      } else {
+        resetResults(); setCompetitors([]);
+      }
+    } catch (err) {
+      setError(String(err.message || err));
+    }
+  }, []);
+
+  const toggleDailyRefresh = useCallback(async (id, enabled) => {
+    try {
+      const data = await api(`/api/ideas/${id}/daily-refresh`, { method: "POST", body: { enabled } });
+      setCurrentIdea((c) => (c && c.id === id ? { ...c, daily_refresh: data.dailyRefresh } : c));
+      setIdeas((list) => list.map((i) => (i.id === id ? { ...i, daily_refresh: data.dailyRefresh } : i)));
+    } catch (err) {
+      setError(String(err.message || err));
+    }
+  }, []);
+
+  const startNewSearch = () => {
+    setIdea(""); setFeatures(""); setStep("product"); setConfirmed(false);
+    resetResults(); setView("search"); setError(null);
+  };
+
+  const busy = discovering || sweeping;
+
+  return (
+    <main className="min-h-dvh px-4 sm:px-6 pb-16 max-w-5xl mx-auto">
+      {/* ── Header ───────────────────────────────────────────────────────────── */}
+      <header className="reveal pt-10 pb-7 flex items-start justify-between gap-4 border-b border-white/8">
+        <div>
+          <div className="flex items-center gap-3">
+            <img src={lurkrIcon} alt="Lurkr" className="h-11 w-11 sm:h-14 sm:w-14 rounded-2xl shadow-lg shadow-black/40" />
+            <h1 className="font-serif text-6xl sm:text-7xl leading-[0.85] tracking-tight">Lurkr</h1>
+          </div>
+          <p className="font-serif italic text-base sm:text-lg text-neutral-400 mt-2">always watching, never blinking</p>
+        </div>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="watch-ring absolute inline-flex h-full w-full rounded-full bg-[var(--color-signal)]" />
+              <span className="watch-dot relative inline-flex h-2 w-2 rounded-full bg-[var(--color-signal)]" />
+            </span>
+            <span className="label !text-[var(--color-signal)]">Monitoring</span>
+          </div>
+          <span className="label !lowercase !tracking-wide text-neutral-500 max-w-[40vw] truncate">{user?.email}</span>
+          <button onClick={onSignOut} className="label hover:text-red-400 transition-colors">Sign out</button>
+        </div>
+      </header>
+
+      {/* ── Nav ──────────────────────────────────────────────────────────────── */}
+      <nav className="reveal mt-5 flex items-center gap-2">
+        <NavBtn active={view === "search"} onClick={startNewSearch}>New search</NavBtn>
+        <NavBtn active={view === "ideas"} onClick={() => setView("ideas")}>My ideas</NavBtn>
+      </nav>
+
+      {error && (
+        <pre className="reveal mt-5 rounded-lg border border-red-900/70 bg-red-950/30 p-4 text-sm text-red-300 whitespace-pre-wrap mono">{error}</pre>
+      )}
+
+      {view === "ideas" ? (
+        <IdeasView ideas={ideas} loading={ideasLoading} onOpen={openIdea} onToggle={toggleDailyRefresh} onNew={startNewSearch} />
+      ) : (
+        <>
+          {/* ── Guided intake (wizard) OR collapsed summary once confirmed ────── */}
+          {!confirmed ? (
+            <section key={step} className="reveal panel mt-7 p-5 sm:p-6" style={{ animationDelay: "0.05s" }}>
+              <Stepper step={step} />
+              {step === "product" && (
+                <div className="mt-4">
+                  <h2 className="font-serif text-2xl mb-1">What are you building?</h2>
+                  <p className="text-sm text-neutral-500 mb-3">Describe your startup or idea in a sentence or two.</p>
+                  <textarea value={idea} onChange={(e) => setIdea(e.target.value)} autoFocus rows={4}
+                    placeholder="e.g. A mobile-first AI notetaker that turns meetings into shareable team knowledge."
+                    className="w-full rounded-lg border border-white/10 bg-black/30 px-3.5 py-3 text-[15px] leading-relaxed outline-none focus:border-[var(--color-signal)]/60 transition-colors resize-none placeholder:text-neutral-600" />
+                  <div className="mt-4 flex justify-end">
+                    <button onClick={() => setStep("features")} disabled={!idea.trim()}
+                      className="rounded-lg bg-[var(--color-signal)] text-black hover:brightness-110 active:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 text-sm font-semibold tracking-tight transition">Continue →</button>
+                  </div>
+                </div>
+              )}
+              {step === "features" && (
+                <div className="mt-4">
+                  <h2 className="font-serif text-2xl mb-1">Key features <span className="text-neutral-500 text-lg italic">— optional</span></h2>
+                  <p className="text-sm text-neutral-500 mb-3">What sets it apart? Helps tailor the analysis. You can skip this.</p>
+                  <textarea value={features} onChange={(e) => setFeatures(e.target.value)} autoFocus rows={3}
+                    placeholder="e.g. real-time transcription, native mobile app, Slack integration, per-seat pricing"
+                    className="w-full rounded-lg border border-white/10 bg-black/30 px-3.5 py-3 text-sm leading-relaxed outline-none focus:border-[var(--color-signal)]/60 transition-colors resize-none placeholder:text-neutral-600" />
+                  <div className="mt-4 flex justify-between">
+                    <button onClick={() => setStep("product")} className="rounded-lg border border-white/10 hover:bg-white/5 px-4 py-2.5 text-sm font-medium transition">← Back</button>
+                    <button onClick={() => setStep("confirm")} className="rounded-lg bg-[var(--color-signal)] text-black hover:brightness-110 active:brightness-95 px-5 py-2.5 text-sm font-semibold tracking-tight transition">{features.trim() ? "Continue →" : "Skip →"}</button>
+                  </div>
+                </div>
+              )}
+              {step === "confirm" && (
+                <div className="mt-4">
+                  <h2 className="font-serif text-2xl mb-3">Ready to scan?</h2>
+                  <div className="space-y-3">
+                    <div><div className="label mb-1">Product</div><p className="text-[15px] text-neutral-200 leading-relaxed">{idea}</p></div>
+                    <div><div className="label mb-1">Key features</div><p className="text-sm leading-relaxed">{features.trim() ? <span className="text-neutral-300">{features}</span> : <span className="text-neutral-600 italic">none provided</span>}</p></div>
+                  </div>
+                  <div className="mt-5 flex justify-between">
+                    <button onClick={() => setStep("product")} className="rounded-lg border border-white/10 hover:bg-white/5 px-4 py-2.5 text-sm font-medium transition">← Edit</button>
+                    <button onClick={confirmAndDiscover} className="rounded-lg bg-[var(--color-signal)] text-black hover:brightness-110 active:brightness-95 px-5 py-2.5 text-sm font-semibold tracking-tight transition">✓ Confirm &amp; find competitors</button>
+                  </div>
+                </div>
+              )}
+            </section>
+          ) : (
+            <section className="reveal panel mt-7 p-4 sm:p-5 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="label mb-1">Your product</div>
+                <p className="font-serif text-xl leading-tight truncate">{idea}</p>
+                {features.trim() && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{features}</p>}
+                <div className="mt-2 flex items-center gap-3 flex-wrap">
+                  {space && <span className="label">space: <span className="text-neutral-300 normal-case tracking-normal">{space}</span></span>}
+                  {currentIdea?.run_at && (
+                    <span className="label">{currentIdea.source === "cron" ? "daily-refreshed" : "last run"}: <span className="text-neutral-300 normal-case tracking-normal">{new Date(currentIdea.run_at).toLocaleString()}</span></span>
+                  )}
+                  {discovering && <span className="label !text-[var(--color-signal)] animate-pulse">scanning the market…</span>}
+                </div>
+              </div>
+              <button onClick={editIntake} disabled={discovering || sweeping} className="shrink-0 rounded-lg border border-white/10 hover:bg-white/5 disabled:opacity-40 px-3.5 py-2 text-xs font-medium transition">Edit</button>
+            </section>
+          )}
+
+          {/* ── Targets ──────────────────────────────────────────────────────── */}
+          {hasCompetitors && (
+            <section className="reveal mt-8">
+              <div className="flex items-end justify-between gap-4 mb-4">
+                <div>
+                  <div className="label mb-1">02 — Targets acquired</div>
+                  <p className="font-serif text-2xl leading-none">{competitors.length} competitor{competitors.length === 1 ? "" : "s"}</p>
+                  {gathering && <p className="label !text-[var(--color-signal)] mt-2 animate-pulse">▸ gathering live signals — web + news</p>}
+                  {!gathering && signalCounts && <p className="label mt-2">live signals · mkt {signalCounts.marketing} · prod {signalCounts.product} · sales {signalCounts.sales}</p>}
+                </div>
+                <button onClick={runSweep} disabled={busy} className="shrink-0 rounded-lg border border-[var(--color-signal)]/40 bg-[var(--color-signal)]/10 text-[var(--color-signal)] hover:bg-[var(--color-signal)]/20 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 text-sm font-semibold tracking-tight transition">
+                  {gathering ? "Gathering…" : sweeping ? "Analyzing…" : strategy.brief ? "Re-run sweep" : "Run intelligence sweep"}
+                </button>
+              </div>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {competitors.map((c, i) => (
+                  <div key={i} className="reveal panel group p-3.5" style={{ animationDelay: `${0.04 * i}s` }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-serif text-lg leading-tight">{c.name}</span>
+                        {c.website && (
+                          <a href={c.website.startsWith("http") ? c.website : `https://${c.website}`} target="_blank" rel="noreferrer"
+                            className="block label !lowercase !tracking-wide text-neutral-500 hover:text-[var(--color-signal)] transition-colors truncate">{c.website.replace(/^https?:\/\//, "")}</a>
+                        )}
+                      </div>
+                      {!strategy.brief && (
+                        <button onClick={() => removeCompetitor(i)} className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-red-400 text-xs transition-opacity" aria-label={`Remove ${c.name}`}>✕</button>
+                      )}
+                    </div>
+                    {c.description && <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed">{c.description}</p>}
+                    {c.why_relevant && <p className="mt-1 text-[11px] text-neutral-600 italic font-serif">{c.why_relevant}</p>}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Field agents ─────────────────────────────────────────────────── */}
+          {(sweeping || strategy.brief) && (
+            <section className="mt-9">
+              <div className="label mb-4">03 — Field agents</div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {ANALYSTS.map((a) => {
+                  const state = agents[a.id]; const s = STATUS[state.status];
+                  return (
+                    <div key={a.id} className="panel p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${s.dot}`} /><h2 className="font-serif text-xl leading-none">{a.label}</h2></div>
+                        <span className={`label ${s.text}`}>{s.word}</span>
+                      </div>
+                      <p className="label !tracking-wide !lowercase mt-1.5">{a.blurb}</p>
+                      <div className="mt-3.5 grid gap-2">
+                        {state.findings.map((f, i) => (
+                          <div key={i} className="reveal rounded-lg border border-white/8 bg-black/25 p-3" style={{ animationDelay: `${0.05 * i}s` }}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-medium">{f.competitor}</span>
+                              {a.tag(f) && <span className="label !text-[10px] rounded border border-white/10 px-1.5 py-0.5 text-neutral-300 whitespace-nowrap">{a.tag(f)}</span>}
+                            </div>
+                            <p className="mt-1.5 text-xs text-neutral-300 leading-relaxed">{a.headline(f)}</p>
+                            {a.sub(f) && <p className="mt-1 text-[11px] text-neutral-600 italic">↳ {a.sub(f)}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* ── Dossier ──────────────────────────────────────────────────────── */}
+          {(strategy.status !== "idle" || strategy.brief) && (
+            <section className="mt-9">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="label">04 — Strategy dossier</span>
+                <span className={`label ${STATUS[strategy.status].text}`}>· {STATUS[strategy.status].word}</span>
+              </div>
+              {strategy.brief ? (
+                <div className="panel reveal p-5 sm:p-7">
+                  {strategy.brief.summary && <p className="font-serif text-lg sm:text-xl leading-relaxed text-neutral-200">{strategy.brief.summary}</p>}
+                  <div className="mt-6 grid gap-3 md:grid-cols-2">
+                    <Brief kind="threat" {...(strategy.brief.threat || {})} />
+                    <Brief kind="opportunity" {...(strategy.brief.opportunity || {})} />
+                  </div>
+                  {Array.isArray(strategy.brief.watch_items) && strategy.brief.watch_items.length > 0 && (
+                    <div className="mt-6 border-t border-white/8 pt-4">
+                      <div className="label mb-2">Watch items</div>
+                      <ul className="space-y-1.5">
+                        {strategy.brief.watch_items.map((w, i) => (
+                          <li key={i} className="flex gap-2 text-sm text-neutral-300"><span className="text-[var(--color-signal)] mono text-xs mt-0.5">▸</span><span>{typeof w === "string" ? w : JSON.stringify(w)}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {currentIdea && <DailyRefreshToggle idea={currentIdea} onToggle={toggleDailyRefresh} />}
+                </div>
+              ) : (
+                <div className="panel p-10 text-center"><p className="label !text-[var(--color-signal)] animate-pulse">synthesizing the dossier…</p></div>
+              )}
+            </section>
+          )}
+        </>
+      )}
+    </main>
+  );
+}
+
+function NavBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick}
+      className={`rounded-lg px-3.5 py-2 text-sm font-medium transition ${active ? "bg-[var(--color-signal)]/15 text-[var(--color-signal)] border border-[var(--color-signal)]/40" : "border border-white/10 text-neutral-400 hover:bg-white/5"}`}>
+      {children}
+    </button>
+  );
+}
+
+function DailyRefreshToggle({ idea, onToggle }) {
+  return (
+    <div className="mt-6 border-t border-white/8 pt-4 flex items-center justify-between gap-4">
+      <div>
+        <div className="label mb-0.5">Daily refresh</div>
+        <p className="text-xs text-neutral-500">Re-run this sweep automatically every day at 4:00 AM IST and cache the result.</p>
+      </div>
+      <button
+        onClick={() => onToggle(idea.id, !idea.daily_refresh)}
+        className={`shrink-0 relative h-6 w-11 rounded-full transition-colors ${idea.daily_refresh ? "bg-[var(--color-signal)]" : "bg-neutral-700"}`}
+        aria-pressed={idea.daily_refresh} aria-label="Toggle daily refresh"
+      >
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-black transition-all ${idea.daily_refresh ? "left-[22px]" : "left-0.5"}`} />
+      </button>
+    </div>
+  );
+}
+
+function IdeasView({ ideas, loading, onOpen, onToggle, onNew }) {
+  return (
+    <section className="reveal mt-7">
+      <div className="flex items-end justify-between gap-4 mb-4">
+        <div>
+          <div className="label mb-1">Your ideas</div>
+          <p className="font-serif text-2xl leading-none">{ideas.length} saved</p>
+        </div>
+        <button onClick={onNew} className="shrink-0 rounded-lg bg-[var(--color-signal)] text-black hover:brightness-110 px-4 py-2.5 text-sm font-semibold tracking-tight transition">+ New search</button>
+      </div>
+      {loading ? (
+        <div className="panel p-10 text-center"><p className="label !text-[var(--color-signal)] animate-pulse">loading…</p></div>
+      ) : ideas.length === 0 ? (
+        <div className="panel p-10 text-center text-neutral-500 text-sm">No ideas yet. Run your first intelligence sweep.</div>
+      ) : (
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {ideas.map((i, k) => (
+            <div key={i.id} className="reveal panel p-4" style={{ animationDelay: `${0.04 * k}s` }}>
+              <button onClick={() => onOpen(i.id)} className="block w-full text-left">
+                <p className="font-serif text-lg leading-tight">{i.idea}</p>
+                {i.features && <p className="mt-1 text-xs text-neutral-500 line-clamp-2">{i.features}</p>}
+                <div className="mt-2 flex items-center gap-3 flex-wrap">
+                  {i.space && <span className="label">{i.space}</span>}
+                  {i.last_run && <span className="label">{i.last_source === "cron" ? "daily" : "run"}: <span className="normal-case tracking-normal text-neutral-400">{new Date(i.last_run).toLocaleDateString()}</span></span>}
+                </div>
+              </button>
+              <div className="mt-3 pt-3 border-t border-white/8 flex items-center justify-between">
+                <span className="label">Daily refresh</span>
+                <button onClick={() => onToggle(i.id, !i.daily_refresh)}
+                  className={`relative h-5 w-9 rounded-full transition-colors ${i.daily_refresh ? "bg-[var(--color-signal)]" : "bg-neutral-700"}`} aria-pressed={i.daily_refresh}>
+                  <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-black transition-all ${i.daily_refresh ? "left-[18px]" : "left-0.5"}`} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Stepper({ step }) {
+  const steps = [{ id: "product", label: "Product" }, { id: "features", label: "Features" }, { id: "confirm", label: "Confirm" }];
+  const idx = steps.findIndex((s) => s.id === step);
+  return (
+    <div className="flex items-center gap-2">
+      {steps.map((s, i) => (
+        <div key={s.id} className="flex items-center gap-2">
+          <span className={`flex items-center gap-1.5 label ${i === idx ? "!text-[var(--color-signal)]" : i < idx ? "text-neutral-400" : "text-neutral-600"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${i === idx ? "bg-[var(--color-signal)]" : i < idx ? "bg-neutral-400" : "bg-neutral-700"}`} />
+            {s.label}
+          </span>
+          {i < steps.length - 1 && <span className="text-neutral-700 text-xs">→</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Brief({ kind, title, evidence, action }) {
+  const isThreat = kind === "threat";
+  const accent = isThreat ? "border-red-500/30 bg-red-500/[0.06]" : "border-emerald-500/30 bg-emerald-500/[0.06]";
+  const labelColor = isThreat ? "text-red-400" : "text-emerald-400";
+  const label = isThreat ? "Biggest threat" : "Biggest opportunity";
+  return (
+    <div className={`rounded-xl border ${accent} p-4`}>
+      <div className="flex items-center gap-1.5"><span className={`h-1.5 w-1.5 rounded-full ${isThreat ? "bg-red-400" : "bg-emerald-400"}`} /><span className={`label ${labelColor}`}>{label}</span></div>
+      {title && <p className="mt-2 font-serif text-xl leading-tight text-neutral-100">{title}</p>}
+      {evidence && <p className="mt-2 text-xs text-neutral-400 leading-relaxed">{evidence}</p>}
+      {action && <p className="mt-3 text-sm text-neutral-200 leading-relaxed"><span className="label mr-1">Action</span>{action}</p>}
+    </div>
+  );
+}
