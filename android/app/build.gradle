@@ -4,6 +4,10 @@ apply plugin: 'com.android.application'
 // which decode the keystore from the ANDROID_* GitHub Secrets. When ANDROID_KEYSTORE_FILE is
 // unset (e.g. a local debug build), release signing is simply skipped.
 def releaseKeystore = System.getenv("ANDROID_KEYSTORE_FILE")
+// Compute version into plain vars so the defaultConfig setters take a bare value
+// (a leading "(" right after `versionCode` is parsed as a method call -> "Value is null").
+def releaseVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+def releaseVersionName = System.getenv("ANDROID_VERSION_NAME") ?: "1.0"
 
 android {
     namespace "com.lurkr.app"
@@ -13,8 +17,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Bumped per build by CI; defaults keep local builds working.
-        versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
-        versionName System.getenv("ANDROID_VERSION_NAME") ?: "1.0"
+        versionCode releaseVersionCode
+        versionName releaseVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
