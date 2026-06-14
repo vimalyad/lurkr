@@ -178,14 +178,16 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - [ ] M7.5 (optional) — structured sources where resolvable: Greenhouse/Lever job APIs, app-store/play review scrapers.
 - [x] M8 — Design overhaul: "intelligence terminal / surveillance dossier" aesthetic (built via the frontend-design skill).
 - [x] M9 — Automatic Prompt Optimization harness (offline OPRO/judge loop). Analyst prompts in `agents.js` are the tuned winners.
-- [ ] M10 — Neon persistence + GitHub Actions scheduling + Resend email alerts
+- [~] M10 — Android APK migration: **Next.js → Vite + React frontend + standalone Express backend** (web part DONE & verified; Capacitor/APK packaging pending). See "APK migration" section below.
+- [ ] M11 — Neon persistence + GitHub Actions scheduling + Resend email alerts
 
 ## Phone testing (do this BEFORE Vercel deploy)
 - Same Wi-Fi, open `http://192.168.1.139:3000` on the iQOO (LAN IP of this laptop; re-check if the network changes).
 - LAN HTTP is fine for testing all FUNCTIONALITY (sweep, cards, inject, toast). NOTE: full PWA install ("Add to Home Screen" app prompt + service worker) needs HTTPS — that only works after the Vercel deploy, not over LAN HTTP. So: validate behavior on the phone now; validate the installable PWA experience post-deploy.
 - If the phone can't connect, allow Node through Windows Firewall (inbound TCP 3000) — the dev server binds to all interfaces by default.
 
-## Current implementation map (keep this current) — post-M6
+## Current implementation map  ← the route/page paths below are SUPERSEDED by the Vite+Express split (see "APK migration" at the end). The src/lib/* descriptions still apply (reused by the Express backend).
+### (post-M6, Next-era)
 - `src/lib/agents.js` — `MODELS` (analysts: `anthropic/claude-3.5-haiku`; Strategy + Discovery: `anthropic/claude-sonnet-4.5`). `DISCOVERY` + idea-aware `ANALYSTS` + `STRATEGY` prompts. Analysts take `{your_idea, your_features, competitors}`.
 - `src/lib/openrouter.js` — `runAgent()`: OpenRouter call, try/catch + 1 retry, `parseJsonLoose()` strips ```json fences (the Strategy model wraps JSON in fences despite `response_format`).
 - `src/lib/sources/tavily.js` — `tavilySearch(query, opts)` (needs `TAVILY_API_KEY`). `src/lib/sources/news.js` — `googleNews(query)` (keyless RSS).
@@ -203,3 +205,12 @@ const out = data.choices[0].message.content; // parse with try/catch + 1 retry
 - Run: `node scripts/optimize-prompts.mjs [marketing|product|sales|all] [rounds]` (reads `OPENROUTER_API_KEY` from `.env.local`).
 - The MARKETING/PRODUCT/SALES prompts in `src/lib/agents.js` are the APO-tuned winners (judge scores: marketing 72→78, product 75→80, sales 58.5→75). To re-optimize: re-run and copy the new winners back into `agents.js`.
 - Purely OFFLINE — not in the request path; never mutates the live app automatically (human reviews/copies winners). Metric is a small LLM-judged sample, so treat small deltas as noise.
+
+## APK migration (Vite + React frontend + Express backend) — M10
+Goal: ship Lurkr as a sideloadable Android APK. Capacitor serves a STATIC bundle, so the app is split:
+- **Frontend (→ APK):** Vite + React (no Next). `index.html` (loads Google Fonts), `src/main.jsx`, `src/App.jsx` (the whole dashboard, ported from the old `page.js`), `src/index.css` (Tailwind v4 via `@tailwindcss/vite`, fonts referenced by name). Calls the backend at `import.meta.env.VITE_API_URL` (empty in browser dev → Vite proxy; set to `http://<LAN_IP>:8787` for the APK build).
+- **Backend (stays on laptop):** `server/index.mjs` — Express, holds the keys, reuses `src/lib/*`. Endpoints: POST `/api/discover`, `/api/gather`, `/api/agent/:id`, `/api/strategy`, plus GET `/health`. Binds `0.0.0.0:8787`, open CORS, loads keys from `.env.local`/`.env`. Gather logic now lives in `src/lib/gather.js` (reused).
+- **Dev:** `npm run server` (Express :8787) + `npm run dev` (Vite :5173, `host:true`, proxies `/api`→8787). Phone-test in browser at `http://<LAN_IP>:5173`.
+- **Build:** `npm run build` → `dist/` (verify CSS is ~20kB, not ~600B).
+- **Removed:** all Next.js (`next.config.mjs`, `src/app/**`, Next API routes, `next/font`). `public/manifest.json` is now unused.
+- **APK step (PENDING):** add `@capacitor/core,cli,android` + `@capacitor/status-bar`; `cap init` (appId, webDir `dist`); `cap add android`; set `VITE_API_URL` to the laptop LAN IP, add `usesCleartextTraffic=true` + CAMERA perm if needed, StatusBar overlay fix; build with Android Studio JBR (system Java 25 is too new): `cd android && JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug`. NOTE: SDK has android-34 & android-36 but NOT android-35 (Capacitor 7 default) — install `platforms;android-35` or set compileSdk to an installed one. Deploy by MTP sideload (USB debugging is blocked on the device).

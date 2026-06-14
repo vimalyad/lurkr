@@ -1,6 +1,8 @@
-"use client";
-
 import { useState, useCallback } from "react";
+
+// Backend base URL. Empty in browser dev (Vite proxies /api → the Express server).
+// In the packaged APK, set VITE_API_URL=http://<LAN_IP>:<PORT> at build time.
+const API = import.meta.env.VITE_API_URL ?? "";
 
 // ── Agent presentation config ────────────────────────────────────────────────
 const ANALYSTS = [
@@ -43,7 +45,7 @@ const initialAgentState = () => ({
   sales: { status: "idle", findings: [] },
 });
 
-export default function Home() {
+export default function App() {
   const [idea, setIdea] = useState("");
   const [features, setFeatures] = useState("");
   const [space, setSpace] = useState("");
@@ -72,7 +74,7 @@ export default function Home() {
     setStrategy({ status: "idle", brief: null });
     setAgents(initialAgentState());
     try {
-      const res = await fetch("/api/discover", {
+      const res = await fetch(`${API}/api/discover`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idea, features }),
@@ -103,7 +105,7 @@ export default function Home() {
     setGathering(true);
     let buckets = { marketing: [], product: [], sales: [] };
     try {
-      const gres = await fetch("/api/gather", {
+      const gres = await fetch(`${API}/api/gather`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ competitors }),
@@ -125,7 +127,7 @@ export default function Home() {
     const results = await Promise.all(
       ANALYSTS.map(async (a) => {
         try {
-          const res = await fetch(`/api/agent/${a.id}`, {
+          const res = await fetch(`${API}/api/agent/${a.id}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ idea, features, competitors, signals: buckets[a.id] }),
@@ -152,7 +154,7 @@ export default function Home() {
     // 2) Strategy synthesizes a brief for the user's product.
     setStrategy({ status: "analyzing", brief: null });
     try {
-      const res = await fetch("/api/strategy", {
+      const res = await fetch(`${API}/api/strategy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idea, features, ...Object.fromEntries(results) }),
