@@ -1,5 +1,10 @@
 apply plugin: 'com.android.application'
 
+// Release signing is driven entirely by env vars set in CI (see .github/workflows/release-apk.yml),
+// which decode the keystore from the ANDROID_* GitHub Secrets. When ANDROID_KEYSTORE_FILE is
+// unset (e.g. a local debug build), release signing is simply skipped.
+def releaseKeystore = System.getenv("ANDROID_KEYSTORE_FILE")
+
 android {
     namespace "com.lurkr.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +12,9 @@ android {
         applicationId "com.lurkr.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Bumped per build by CI; defaults keep local builds working.
+        versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+        versionName System.getenv("ANDROID_VERSION_NAME") ?: "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +22,24 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (releaseKeystore != null) {
+                storeFile file(releaseKeystore)
+                storeType "PKCS12"
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (releaseKeystore != null) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

@@ -22,3 +22,10 @@
 # Internal docs (kept local, not pushed)
 CLAUDE.md
 DEMO.md
+
+# Android release signing key — NEVER commit (also lives in GitHub Secrets)
+lurkr-release.p12
+lurkr-release.p12.password.txt
+*.p12
+*.jks
+*.keystore
