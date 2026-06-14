@@ -1,0 +1,20 @@
+# Build check — compiles the frontend on every PR and push so broken imports /
+# syntax errors are caught before merge (the deploy/release builds run only on main).
+name: CI
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
