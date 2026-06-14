@@ -118,20 +118,25 @@ analytical claim must reference concrete retrieved evidence rather than parametr
 
 ## 4. Authentication & session model
 
-Rolled in-house on the **Node standard library — zero third-party auth dependencies.**
+The **server-side auth surface uses only the Node standard library** — no crypto or auth SDKs.
+The single client-side dependency is a Capacitor plugin driving the native Android account picker.
 
 | Concern | Mechanism | Heavy-word framing |
 |---|---|---|
 | Password storage | `scrypt` KDF, per-user random salt, constant-time compare | memory-hard key derivation, timing-attack-resistant verification |
 | Sessions | HS256 JWT (HMAC-SHA256 over the standard library) | **stateless, horizontally-scalable** session layer — no server-side session store |
-| Google sign-in | Google Identity Services **ID-token flow**, verified via `tokeninfo` | secret-less federated identity; audience-pinned token validation |
+| Google sign-in (web) | Google Identity Services **ID-token flow**, verified via `tokeninfo` | secret-less federated identity; audience-pinned token validation |
+| Google sign-in (Android) | native account picker via `@capgo/capacitor-social-login` | platform-native federated sign-in; identical server-side verification |
 | Transport of identity | `Authorization: Bearer` + global `401 → re-auth` event bus | uniform credential propagation; centralised session-expiry handling |
 | Gating | hard gate — no valid session, no app | deny-by-default access control |
 
-Notable: the Google **client secret is never used** — the browser obtains a signed ID token and
+Notable: the Google **client secret is never used** — the client obtains a signed ID token and
 the backend validates it against Google's public endpoint, so there is no server-side
-code-exchange and no secret to leak. *(Email verification + password reset are intentionally
-deferred until a verified sending domain is provisioned.)*
+code-exchange and no secret to leak. Because Google blocks its web sign-in inside Android
+WebViews, the **APK uses the device account picker** (Capacitor plugin) while the web build keeps
+the GIS button; both yield an ID token with the same Web-client audience, so `/api/auth/google`
+verifies them identically. *(Email verification + password reset are intentionally deferred until
+a verified sending domain is provisioned.)*
 
 ---
 
@@ -250,7 +255,8 @@ responds immediately and processes asynchronously (fire-and-forget background wo
 > orchestration** with **cost-aware model tiering**, **per-source fault isolation**, and
 > **bounded-retry deserialization**, tuned by an **LLM-as-judge prompt-optimisation harness**.
 > Identity is **zero-dependency in-house auth** — **scrypt KDF**, **HMAC-signed stateless JWTs**,
-> and **secret-less federated Google ID-token verification**. Reads are served from a
+> and **secret-less federated Google ID-token verification** (web GIS with a **native Android
+> account-picker** fallback). Reads are served from a
 > **stale-while-present read-through cache** over **serverless Postgres** with **idempotent
 > migrations**, warmed nightly by an **externally-triggered batch reconciliation cron**. Delivery
 > is **build-once**: a **cryptographically-signed, auto-versioned APK pipeline** plus

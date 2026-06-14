@@ -57,7 +57,7 @@ never shipped inside the APK):
 - **OpenRouter** (OpenAI-compatible) — LLM calls (analysts on a fast model, Strategy/Discovery on a stronger one)
 - **Tavily** + **Google News RSS** — live competitor signals
 - **Neon** (Postgres) — accounts + every user's ideas and cached analyses
-- **Auth** — roll-our-own on Neon: scrypt passwords + HS256 JWTs + Google sign-in (zero extra deps)
+- **Auth** — roll-our-own on Neon: scrypt passwords + HS256 JWTs (zero backend deps); Google sign-in via GIS on the web and a native account picker (`@capgo/capacitor-social-login`) in the APK
 - **Daily refresh** — a GitHub Actions schedule re-runs opted-in ideas at 04:00 IST
 
 ## Getting started (local dev)
