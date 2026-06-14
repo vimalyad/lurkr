@@ -232,7 +232,27 @@ responds immediately and processes asynchronously (fire-and-forget background wo
 
 ---
 
-## 10. Security posture
+## 10. Why this stack (key decisions)
+
+Each choice, the one-line rationale, and the main alternative we weighed.
+
+| Choice | Why | Alternative considered |
+|---|---|---|
+| **Neon** (serverless Postgres) | Real relational model (`users → ideas → analyses`) **plus** JSONB for the nested briefs; **scale-to-zero** economics fit a free-tier, pre-revenue app; **DB branching** for safe dev/CI. It's plain Postgres → **zero lock-in**. | Firestore (NoSQL — awkward joins, lock-in); Supabase (great, but bundles auth/realtime we built ourselves); RDS/self-host (always-on cost, no scale-to-zero). |
+| **OpenRouter** (LLM gateway) | One OpenAI-compatible API across providers → **cost-aware model tiering** (cheap analysts, strong synthesis) and easy model swaps without vendor lock-in. | Calling a single provider SDK directly (locks model choice, no fallback). |
+| **Roll-our-own auth** | Needs only scrypt + HMAC JWT (Node std-lib) → **no auth SDK, minimal supply-chain surface**, full control, and it keeps user data in our own Postgres. | Auth0/Clerk/Firebase Auth (another vendor, another bill, data off-platform). |
+| **Render** (backend host) | Free tier, deploy-from-`render.yaml`, auto-deploy on push → zero-ops API tier next to the data. | A VPS (manual ops); serverless functions (cold starts + statefulness friction for the streaming sweep). |
+| **GitHub Pages thin-shell APK** | Frontend updates ship by `git push` (no rebuild/reinstall); always-on CDN, no cold start. | Bundling the web app in the APK (rebuild every change); a paid app host. |
+| **GitHub Actions cron** | External, sleep-proof trigger for the 04:00 IST refresh — survives free-tier instance idling; already our CI plane. | In-process `node-cron` (won't fire when the instance sleeps); paid scheduler. |
+| **`@capgo/capacitor-social-login`** | The one client dep — Google blocks web sign-in in Android WebViews, so native sign-in needs a platform bridge. | Web GIS only (broken in the APK); a heavier native auth SDK. |
+
+The through-line: **managed where it removes ops, standard/portable where it avoids lock-in, and
+free-tier-friendly throughout** — sized for a pre-revenue product that can scale when usage (and
+usage-based billing) arrive.
+
+---
+
+## 11. Security posture
 
 - **Secret isolation:** all third-party keys and the data plane sit behind the API tier; the
   client bundle ships *no* secrets.
@@ -247,7 +267,7 @@ responds immediately and processes asynchronously (fire-and-forget background wo
 
 ---
 
-## 11. Talking points (the heavy words, in one breath)
+## 12. Talking points (the heavy words, in one breath)
 
 > Lurkr is a **multi-agent, retrieval-augmented competitive-intelligence platform**. A
 > **thin-client Capacitor shell** renders a **CDN-hosted React SPA** against a **stateless,
