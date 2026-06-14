@@ -1,6 +1,23 @@
+<div align="center">
+
+<img src="assets/icon-only.png" alt="Lurkr" width="116" height="116" />
+
 # Lurkr
 
 **Always watching, never blinking — the intelligence team that never sleeps.**
+
+<p>
+  <img src="https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/Capacitor-7-119EFF?logo=capacitor&logoColor=white" alt="Capacitor" />
+  <img src="https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white" alt="Express" />
+  <img src="https://img.shields.io/badge/Neon-Postgres-00E599?logo=postgresql&logoColor=white" alt="Neon" />
+  <img src="https://img.shields.io/badge/OpenRouter-LLM-8A63D2" alt="OpenRouter" />
+</p>
+
+</div>
+
+---
 
 Lurkr is a multi-agent market intelligence tool. You describe **your own** startup or idea;
 Lurkr finds the real competitors in that space, gathers live data on them, and a team of AI
