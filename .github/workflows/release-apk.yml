@@ -1,0 +1,77 @@
+# Build a SIGNED release APK on every merge to main and publish it to GitHub Releases,
+# so there's always a fresh installable download at github.com/vimalyad/lurkr/releases.
+# The signing key comes from the ANDROID_* repo secrets (set up once, out-of-band).
+name: Build & release APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {} # allow manual builds from the Actions tab
+
+permissions:
+  contents: write # needed to create the GitHub Release
+
+concurrency:
+  group: release-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: npm ci
+
+      # Build the web assets. The installed app loads the live site from GitHub Pages
+      # (capacitor server.url), but a valid webDir must still exist for `cap sync`.
+      - name: Build web assets
+        env:
+          VITE_API_URL: https://lurkr-jgdu.onrender.com
+        run: npm run build
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      # Decode the keystore from the secret into a file the Gradle build can read.
+      - name: Restore signing keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/lurkr-release.p12"
+
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/lurkr-release.p12
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # Monotonic version per build so users can update in place.
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Stage APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk "lurkr-v1.0.${{ github.run_number }}.apk"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Lurkr v1.0.${{ github.run_number }}
+          body: |
+            Auto-built signed APK from commit ${{ github.sha }}.
+            Download `lurkr-v1.0.${{ github.run_number }}.apk` below, then on your phone enable
+            "install unknown apps" and open it. Updates install over the previous version.
+          files: lurkr-v1.0.${{ github.run_number }}.apk
+          generate_release_notes: true

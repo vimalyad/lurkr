@@ -1,5 +1,9 @@
 {
   "appId": "com.lurkr.app",
   "appName": "Lurkr",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "url": "https://vimalyad.github.io/lurkr/",
+    "cleartext": false
+  }
 }

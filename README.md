@@ -99,20 +99,33 @@ Env vars (see `.env.example`, read by the backend):
 The backend deploys to Render from `render.yaml` (Blueprint). Set `OPENROUTER_API_KEY`,
 `TAVILY_API_KEY`, and `DATABASE_URL` in the Render dashboard. It auto-deploys on push to `main`.
 
-## Android APK
+## Android app — automated, build-once
 
-```bash
-# point the build at the hosted backend, then package
-VITE_API_URL=https://<your-render-app>.onrender.com npm run build
-npx cap sync android
-cd android && JAVA_HOME="<Android Studio JBR>" ./gradlew assembleDebug
-# → android/app/build/outputs/apk/debug/app-debug.apk
-```
+The APK is a thin shell: it loads the **live frontend from GitHub Pages**
+(`capacitor.config.json` → `server.url`) rather than bundling its own copy. Two GitHub
+Actions pipelines run on every push/merge to `main`:
 
-Install by copying the APK to the phone (File-transfer USB drag, or download over Wi-Fi /
-any channel) → "install unknown apps" → install. The installed app talks to the hosted
-backend, so it works on any network. Custom launcher icon via `npx @capacitor/assets generate`
-from `assets/icon-only.png`.
+1. **`deploy.yml`** — builds the frontend (with the Render API URL baked in) and publishes it
+   to **GitHub Pages** (`https://vimalyad.github.io/lurkr/`). Installed apps pick up the change
+   on next launch — **no reinstall**.
+2. **`release-apk.yml`** — builds a **signed release APK** and attaches it to a
+   **GitHub Release** (`/releases`), so there's always a fresh installable download. The
+   version bumps automatically (`1.0.<run#>`); installs update in place.
+
+So day-to-day you just `git push` — the app updates itself. You only ever build/install an
+APK by hand if you want to (CI does it for you).
+
+**Install for users:** open the repo's **Releases** page → download the latest
+`lurkr-vX.Y.Z.apk` → on the phone, allow "install unknown apps" → open it.
+
+### Signing key (one-time setup, already done)
+
+Release builds are signed with a PKCS12 keystore stored in repo **Secrets**
+(`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+`ANDROID_KEY_PASSWORD`). A local backup lives at `lurkr-release.p12` (+ its password file),
+gitignored. **Back this up somewhere safe** — if the key is lost, you can't ship in-place
+updates to already-installed apps. Custom launcher icon via
+`npx @capacitor/assets generate` from `assets/icon-only.png`.
 
 ## Roadmap
 

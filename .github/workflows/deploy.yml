@@ -1,0 +1,56 @@
+# Build the Lurkr frontend and publish it to GitHub Pages on every push to main.
+# The installed APK loads this hosted site (via capacitor.config.json -> server.url),
+# so updating the app is just `git push` — no APK rebuild/reinstall needed.
+name: Deploy frontend to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {} # allow manual re-deploys from the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deploy at a time; newer pushes cancel an in-flight build.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Bake in the hosted backend URL, and build under the /lurkr/ Pages subpath.
+      - name: Build
+        env:
+          VITE_API_URL: https://lurkr-jgdu.onrender.com
+        run: npm run build -- --base=/lurkr/
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true # turn Pages on automatically on first run
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
