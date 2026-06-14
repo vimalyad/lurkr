@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import lurkrIcon from "./assets/lurkr-icon.png"; // bundled (hashed) so it always resolves in the APK webview
 
 // Backend base URL. Empty in browser dev (Vite proxies /api → the Express server).
 // In the packaged APK, set VITE_API_URL=http://<LAN_IP>:<PORT> at build time.
@@ -197,7 +198,7 @@ export default function App() {
           <div className="label mb-2">Multi-agent market intelligence</div>
           <div className="flex items-center gap-3">
             <img
-              src="/lurkr-icon.png"
+              src={lurkrIcon}
               alt="Lurkr"
               className="h-11 w-11 sm:h-14 sm:w-14 rounded-2xl shadow-lg shadow-black/40"
             />

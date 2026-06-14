@@ -10,7 +10,7 @@ for your product, each with a recommended action.
 ## How it works
 
 ```
-Your idea + features
+Guided intake:  Product → Key features (optional) → Confirm
         │
         ▼
   Discovery AI ──────────► finds the real competitors in your space
@@ -23,6 +23,7 @@ Your idea + features
         │
         ▼
   Strategy AI ───────────► personalized brief: biggest THREAT + OPPORTUNITY + watch items
+                           (persisted to Postgres / Neon)
 ```
 
 The three analysts run in parallel; their findings feed the Strategy agent, which synthesizes
@@ -30,15 +31,17 @@ the brief for *your* product.
 
 ## Stack
 
-Lurkr is split into a static frontend (packaged as an Android APK via Capacitor) and a
-backend that holds the API keys (runs on your machine — never shipped in the APK):
+Lurkr is split into a static frontend (packaged as an Android APK via Capacitor) and an
+Express backend that holds the API keys (runs locally in dev, hosted on Render in production —
+never shipped inside the APK):
 
 - **Frontend:** Vite + React + Tailwind CSS v4 → static `dist/` (→ Capacitor APK)
-- **Backend:** Express (`server/`), reuses `src/lib/*`
+- **Backend:** Express (`server/`), reuses `src/lib/*`; hosted on **Render**
 - **OpenRouter** (OpenAI-compatible) — LLM calls (analysts on a fast model, Strategy/Discovery on a stronger one)
 - **Tavily** + **Google News RSS** — live competitor signals
+- **Neon** (Postgres) — persists every sweep (optional, gated on `DATABASE_URL`)
 
-## Getting started
+## Getting started (local dev)
 
 ```bash
 npm install
@@ -50,34 +53,51 @@ npm run dev      # Vite dev on :5173 (proxies /api → :8787)
 ```
 
 Open http://localhost:5173 (or `http://<LAN_IP>:5173` from your phone), describe your
-idea, hit **Find my competitors**, then **Run intelligence sweep**.
+idea, **Find my competitors**, then **Run intelligence sweep**.
 
-Required env vars (see `.env.example`, read by the backend):
+Env vars (see `.env.example`, read by the backend):
 
 | Var | Used for | Get one |
 |---|---|---|
 | `OPENROUTER_API_KEY` | all LLM calls | openrouter.ai |
 | `TAVILY_API_KEY` | live web-search signals | tavily.com (free tier) |
+| `DATABASE_URL` | persistence (optional) | neon.tech (free Postgres) |
 
 ## Project layout
 
-- `index.html`, `src/main.jsx`, `src/App.jsx` — the Vite frontend (the whole dashboard)
+- `index.html`, `src/main.jsx`, `src/App.jsx` — the Vite frontend (guided intake + dashboard)
 - `src/index.css` — Tailwind v4 + the design system
-- `server/index.mjs` — Express backend: `/api/discover`, `/api/gather`, `/api/agent/:id`, `/api/strategy`, `/health`
+- `server/index.mjs` — Express backend: `/api/discover`, `/api/gather`, `/api/agent/:id`, `/api/strategy`, `/api/history`, `/health`
 - `src/lib/agents.js` — agent prompts + model config
 - `src/lib/openrouter.js` — OpenRouter client (retry + JSON parsing)
 - `src/lib/gather.js` — bucketed live-signal gathering
+- `src/lib/db.js` — optional Neon persistence
 - `src/lib/sources/` — Tavily + Google News source clients
 - `scripts/optimize-prompts.mjs` — offline prompt-optimization harness
+- `render.yaml` — Render Blueprint for the backend
+- `android/` — Capacitor Android project
+
+## Backend hosting (Render)
+
+The backend deploys to Render from `render.yaml` (Blueprint). Set `OPENROUTER_API_KEY`,
+`TAVILY_API_KEY`, and `DATABASE_URL` in the Render dashboard. It auto-deploys on push to `main`.
 
 ## Android APK
 
-The frontend packages into a sideloadable APK via Capacitor (in progress). The backend
-runs on your laptop; the APK is built with `VITE_API_URL=http://<LAN_IP>:8787` so the
-phone reaches it over the LAN.
+```bash
+# point the build at the hosted backend, then package
+VITE_API_URL=https://<your-render-app>.onrender.com npm run build
+npx cap sync android
+cd android && JAVA_HOME="<Android Studio JBR>" ./gradlew assembleDebug
+# → android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Install by copying the APK to the phone (File-transfer USB drag, or download over Wi-Fi /
+any channel) → "install unknown apps" → install. The installed app talks to the hosted
+backend, so it works on any network. Custom launcher icon via `npx @capacitor/assets generate`
+from `assets/icon-only.png`.
 
 ## Roadmap
 
-- **Persistence (Neon)** — store signals/findings over time, detect what's *new*
 - **Scheduling (GitHub Actions)** — automatic re-sweeps, so it's always watching
 - **Alerts (Resend)** — email when a new high-urgency threat appears
