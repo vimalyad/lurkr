@@ -14,4 +14,16 @@ services:
       - key: TAVILY_API_KEY
         sync: false
       - key: DATABASE_URL
-        sync: false   # your Neon connection string
+        sync: false   # your Neon connection string (required for auth + saved ideas)
+      - key: JWT_SECRET
+        sync: false   # openssl rand -hex 32
+      - key: GOOGLE_CLIENT_ID
+        sync: false   # Google OAuth web client id (for Google sign-in)
+      - key: RESEND_API_KEY
+        sync: false   # email verification + password reset
+      - key: RESEND_FROM
+        sync: false   # e.g. "Lurkr <noreply@yourdomain>"
+      - key: APP_URL
+        sync: false   # https://vimalyad.github.io/lurkr/  (email link target)
+      - key: CRON_SECRET
+        sync: false   # MUST match the CRON_SECRET in GitHub repo secrets
