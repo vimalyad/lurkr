@@ -1,7 +1,17 @@
 /node_modules
 /.next
 /out
+/dist
 .env
 .env.local
 .DS_Store
 *.log
+
+# Capacitor / Android (generated)
+/android/.gradle
+/android/app/build
+/android/build
+/android/local.properties
+/android/.idea
+/android/captures
+*.apk
