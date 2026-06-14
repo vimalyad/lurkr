@@ -31,7 +31,7 @@ jobs:
           distribution: temurin
           java-version: 21 # Capacitor 7 requires JDK 21
 
-      - run: npm ci
+      - run: npm install
 
       # Build the web assets. The installed app loads the live site from GitHub Pages
       # (capacitor server.url), but a valid webDir must still exist for `cap sync`.
