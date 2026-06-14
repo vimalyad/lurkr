@@ -147,9 +147,17 @@ browser receives a signed ID token (`response.credential`) which the backend ver
 Google's `tokeninfo` endpoint. A secret would only be needed for the server-side
 authorization-code flow, which we don't use.
 
-> ⚠️ Google often blocks OAuth inside embedded WebViews. Google sign-in works in a browser at
-> the Pages URL; **inside the installed APK, prefer email/password.** Native Google sign-in
-> would need a Capacitor plugin + APK rebuild.
+**Native (APK) Google sign-in.** Google blocks its web sign-in inside Android WebViews, so the
+app uses native sign-in via `@capgo/capacitor-social-login` (the Android account picker); the web
+build keeps the GIS button. This needs a **second OAuth client of type _Android_** in Google
+Cloud, registered with the package name and the release signing-cert SHA-1:
+- Package: `com.lurkr.app`
+- SHA-1 (release keystore): `openssl pkcs12 -in lurkr-release.p12 -nokeys | openssl x509 -noout -fingerprint -sha1`
+
+The **Web** client ID stays the single source of truth — it is the plugin's `webClientId`, and the
+backend still verifies every token's audience against it (`GOOGLE_CLIENT_ID`). The Android client
+exists only so Google issues a token to the app; its own ID isn't referenced in code. The native
+plugin requires `minSdkVersion 24`.
 
 ## Android app — automated, build-once
 
