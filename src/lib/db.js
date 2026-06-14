@@ -43,14 +43,6 @@ export async function initDb() {
       created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
-    CREATE TABLE IF NOT EXISTS email_tokens (
-      token      TEXT PRIMARY KEY,
-      user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      kind       TEXT NOT NULL,                 -- 'verify' | 'reset'
-      expires_at TIMESTAMPTZ NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-
     CREATE TABLE IF NOT EXISTS ideas (
       id            BIGSERIAL PRIMARY KEY,
       user_id       BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -115,16 +107,6 @@ export async function getUserById(id) {
   return r.rows[0] || null;
 }
 
-export async function setEmailVerified(userId) {
-  const p = getPool();
-  await p.query(`UPDATE users SET email_verified = TRUE WHERE id = $1`, [userId]);
-}
-
-export async function setPasswordHash(userId, passwordHash) {
-  const p = getPool();
-  await p.query(`UPDATE users SET password_hash = $2 WHERE id = $1`, [userId, passwordHash]);
-}
-
 // A Google sign-in for an existing (password) account links the provider + name.
 export async function linkGoogle(userId, name) {
   const p = getPool();
@@ -136,29 +118,6 @@ export async function linkGoogle(userId, name) {
      WHERE id = $1`,
     [userId, name || null]
   );
-}
-
-// ── Email tokens (verify / reset) ────────────────────────────────────────────────
-export async function createEmailToken({ userId, kind, token, ttlMinutes }) {
-  const p = getPool();
-  // one outstanding token per (user, kind)
-  await p.query(`DELETE FROM email_tokens WHERE user_id = $1 AND kind = $2`, [userId, kind]);
-  await p.query(
-    `INSERT INTO email_tokens (token, user_id, kind, expires_at)
-     VALUES ($1, $2, $3, now() + ($4 || ' minutes')::interval)`,
-    [token, userId, kind, String(ttlMinutes)]
-  );
-}
-
-export async function consumeEmailToken(token, kind) {
-  const p = getPool();
-  const r = await p.query(
-    `DELETE FROM email_tokens
-      WHERE token = $1 AND kind = $2 AND expires_at > now()
-      RETURNING user_id`,
-    [token, kind]
-  );
-  return r.rows[0]?.user_id ?? null;
 }
 
 // ── Ideas ────────────────────────────────────────────────────────────────────────

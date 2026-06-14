@@ -4,15 +4,14 @@ import lurkrIcon from "../assets/lurkr-icon.png";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-// modes: "signin" | "signup" | "forgot" | "reset"
-export default function AuthScreen({ initialMode = "signin", resetToken = null, onAuthed }) {
-  const [mode, setMode] = useState(resetToken ? "reset" : initialMode);
+// modes: "signin" | "signup"
+export default function AuthScreen({ initialMode = "signin", onAuthed }) {
+  const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
   const googleRef = useRef(null);
 
   const handleGoogle = useCallback(
@@ -31,9 +30,9 @@ export default function AuthScreen({ initialMode = "signin", resetToken = null, 
     [onAuthed]
   );
 
-  // Render Google Identity Services button (only when a client id is configured).
+  // Render the Google Identity Services button (only when a client id is configured).
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || (mode !== "signin" && mode !== "signup")) return;
+    if (!GOOGLE_CLIENT_ID) return;
     let cancelled = false;
     const init = () => {
       if (cancelled || !window.google?.accounts?.id || !googleRef.current) return;
@@ -59,22 +58,12 @@ export default function AuthScreen({ initialMode = "signin", resetToken = null, 
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
-    setNotice(null);
     setBusy(true);
     try {
-      if (mode === "signup") {
-        const data = await api("/api/auth/signup", { method: "POST", auth: false, body: { email, password, name } });
-        onAuthed(data.token, data.user);
-      } else if (mode === "signin") {
-        const data = await api("/api/auth/login", { method: "POST", auth: false, body: { email, password } });
-        onAuthed(data.token, data.user);
-      } else if (mode === "forgot") {
-        await api("/api/auth/request-reset", { method: "POST", auth: false, body: { email } });
-        setNotice("If an account exists for that email, a reset link is on its way.");
-      } else if (mode === "reset") {
-        const data = await api("/api/auth/reset-password", { method: "POST", auth: false, body: { token: resetToken, password } });
-        onAuthed(data.token, data.user);
-      }
+      const path = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
+      const body = mode === "signup" ? { email, password, name } : { email, password };
+      const data = await api(path, { method: "POST", auth: false, body });
+      onAuthed(data.token, data.user);
     } catch (err) {
       setError(String(err.message || err));
     } finally {
@@ -82,20 +71,7 @@ export default function AuthScreen({ initialMode = "signin", resetToken = null, 
     }
   };
 
-  const switchMode = (m) => { setMode(m); setError(null); setNotice(null); };
-
-  const titles = {
-    signin: "Welcome back",
-    signup: "Create your account",
-    forgot: "Reset your password",
-    reset: "Set a new password",
-  };
-  const subtitles = {
-    signin: "Sign in to run intelligence sweeps and see your saved ideas.",
-    signup: "Track competitors for your ideas — and let Lurkr watch them daily.",
-    forgot: "Enter your email and we'll send a reset link.",
-    reset: "Choose a new password for your account.",
-  };
+  const switchMode = (m) => { setMode(m); setError(null); };
 
   return (
     <main className="min-h-dvh flex items-center justify-center px-4 py-10">
@@ -106,10 +82,14 @@ export default function AuthScreen({ initialMode = "signin", resetToken = null, 
         </div>
         <p className="font-serif italic text-neutral-400 mb-6">always watching, never blinking</p>
 
-        <h2 className="font-serif text-2xl mb-1">{titles[mode]}</h2>
-        <p className="text-sm text-neutral-500 mb-5">{subtitles[mode]}</p>
+        <h2 className="font-serif text-2xl mb-1">{mode === "signup" ? "Create your account" : "Welcome back"}</h2>
+        <p className="text-sm text-neutral-500 mb-5">
+          {mode === "signup"
+            ? "Track competitors for your ideas — and let Lurkr watch them daily."
+            : "Sign in to run intelligence sweeps and see your saved ideas."}
+        </p>
 
-        {(mode === "signin" || mode === "signup") && GOOGLE_CLIENT_ID && (
+        {GOOGLE_CLIENT_ID && (
           <div className="mb-5">
             <div ref={googleRef} className="flex justify-center [color-scheme:light]" />
             <div className="flex items-center gap-3 my-5">
@@ -124,26 +104,11 @@ export default function AuthScreen({ initialMode = "signin", resetToken = null, 
           {mode === "signup" && (
             <Field label="Name" value={name} onChange={setName} type="text" placeholder="Optional" autoFocus />
           )}
-          {mode !== "reset" && (
-            <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@example.com" required autoFocus={mode !== "signup"} />
-          )}
-          {mode !== "forgot" && (
-            <Field
-              label="Password"
-              value={password}
-              onChange={setPassword}
-              type="password"
-              placeholder={mode === "signin" ? "Your password" : "At least 8 characters"}
-              required
-              autoFocus={mode === "reset"}
-            />
-          )}
+          <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@example.com" required autoFocus={mode === "signin"} />
+          <Field label="Password" value={password} onChange={setPassword} type="password" placeholder={mode === "signin" ? "Your password" : "At least 8 characters"} required />
 
           {error && (
             <p className="text-sm text-red-400 bg-red-950/30 border border-red-900/60 rounded-lg px-3 py-2">{error}</p>
-          )}
-          {notice && (
-            <p className="text-sm text-emerald-300 bg-emerald-950/20 border border-emerald-900/50 rounded-lg px-3 py-2">{notice}</p>
           )}
 
           <button
@@ -151,22 +116,15 @@ export default function AuthScreen({ initialMode = "signin", resetToken = null, 
             disabled={busy}
             className="w-full rounded-lg bg-[var(--color-signal)] text-black hover:brightness-110 active:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 text-sm font-semibold tracking-tight transition"
           >
-            {busy ? "…" : mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : mode === "forgot" ? "Send reset link" : "Update password"}
+            {busy ? "…" : mode === "signin" ? "Sign in" : "Create account"}
           </button>
         </form>
 
-        <div className="mt-5 text-sm text-neutral-500 space-y-1.5">
-          {mode === "signin" && (
-            <>
-              <p>New here? <Link onClick={() => switchMode("signup")}>Create an account</Link></p>
-              <p>Forgot your password? <Link onClick={() => switchMode("forgot")}>Reset it</Link></p>
-            </>
-          )}
-          {mode === "signup" && (
+        <div className="mt-5 text-sm text-neutral-500">
+          {mode === "signin" ? (
+            <p>New here? <Link onClick={() => switchMode("signup")}>Create an account</Link></p>
+          ) : (
             <p>Already have an account? <Link onClick={() => switchMode("signin")}>Sign in</Link></p>
-          )}
-          {(mode === "forgot" || mode === "reset") && (
-            <p>Remembered it? <Link onClick={() => switchMode("signin")}>Back to sign in</Link></p>
           )}
         </div>
       </section>

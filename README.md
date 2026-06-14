@@ -83,10 +83,11 @@ Env vars (see `.env.example`, read by the backend):
 | `DATABASE_URL` | accounts + saved ideas (**required**) | neon.tech (free Postgres) |
 | `JWT_SECRET` | signing session tokens | `openssl rand -hex 32` |
 | `GOOGLE_CLIENT_ID` | Google sign-in | Google Cloud Console (OAuth web client) |
-| `RESEND_API_KEY` | verification + reset emails | resend.com |
-| `RESEND_FROM` | email sender address | a verified Resend domain |
-| `APP_URL` | email link target | `https://vimalyad.github.io/lurkr/` |
 | `CRON_SECRET` | locks the daily-refresh endpoint | `openssl rand -hex 32` (also a GH secret) |
+
+> Email verification + password reset are **disabled for now** (they need a verified
+> sending domain — we need to buy one first). Email/password signup only enforces a
+> unique email until then; no email provider is configured.
 
 Frontend build-time vars (set in CI / `vite build` env, not in `.env.local`):
 `VITE_API_URL` (backend base URL) and `VITE_GOOGLE_CLIENT_ID` (Google button).
@@ -96,10 +97,10 @@ Frontend build-time vars (set in CI / `vite build` env, not in `.env.local`):
 - `index.html`, `src/main.jsx`, `src/App.jsx` — the Vite frontend (guided intake + dashboard)
 - `src/index.css` — Tailwind v4 + the design system
 - `src/App.jsx` — auth gate (session check, verify/reset links) → `AuthScreen` or `Dashboard`
-- `src/auth/AuthScreen.jsx` — sign in / sign up / forgot / reset + Google button
+- `src/auth/AuthScreen.jsx` — sign in / sign up + Google button
 - `src/Dashboard.jsx` — the sweep UI, "My Ideas" view, daily-refresh toggle
 - `server/index.mjs` — Express backend: auth (`/api/auth/*`, `/api/me`), pipeline (`/api/discover`, `/api/gather`, `/api/agent/:id`, `/api/strategy`), ideas (`/api/ideas*`), `/api/cron/daily-refresh`, `/health`
-- `src/lib/auth.js` — scrypt + JWT + Google verify; `src/lib/email.js` — Resend
+- `src/lib/auth.js` — scrypt + JWT + Google verify
 - `src/lib/db.js` — Neon: users, ideas, analyses (cache), usage_events
 - `src/lib/pipeline.js` — server-side full sweep (used by the daily cron)
 - `src/lib/agents.js` / `openrouter.js` / `gather.js` / `sources/` — agents + signals
@@ -115,8 +116,9 @@ table above in the Render dashboard. It auto-deploys on push to `main`.
 
 ## Accounts, persistence & daily refresh
 
-- **Hard auth gate.** No session → sign in (Google, or email + password with email
-  verification and password reset). Sessions are HS256 JWTs in `localStorage`.
+- **Hard auth gate.** No session → sign in (Google, or email + password). Sessions are
+  HS256 JWTs in `localStorage`. *Email verification + password reset are deferred until a
+  sending domain is purchased; for now signup only requires a unique email.*
 - **Per-user ideas.** Every sweep is saved under the user's idea (repeat searches of the
   same idea append a new analysis). "My Ideas" lists them; opening one serves the latest
   cached (stale-while-present) analysis. A cache miss just runs a live sweep, as before.

@@ -12,9 +12,8 @@ import { gatherSignals } from "../src/lib/gather.js";
 import { runFullSweep } from "../src/lib/pipeline.js";
 import {
   hashPassword, verifyPassword, signJwt, verifyJwt,
-  verifyGoogleIdToken, randomToken, isValidEmail, passwordProblem,
+  verifyGoogleIdToken, isValidEmail, passwordProblem,
 } from "../src/lib/auth.js";
-import { sendVerificationEmail, sendResetEmail } from "../src/lib/email.js";
 import * as db from "../src/lib/db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -41,8 +40,8 @@ app.get("/health", (_req, res) =>
 );
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
-// Validates the Bearer JWT and loads the (fresh) user so email-verification state
-// is always current. requireVerified additionally blocks unverified accounts.
+// Validates the Bearer JWT and loads the current user, confirming the account
+// still exists before letting the request through.
 async function requireAuth(req, res, next) {
   try {
     const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
@@ -57,11 +56,6 @@ async function requireAuth(req, res, next) {
   }
 }
 
-function requireVerified(req, res, next) {
-  if (!req.user?.email_verified) return fail(res, 403, "Please verify your email first.");
-  next();
-}
-
 const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name, emailVerified: u.email_verified, authProvider: u.auth_provider });
 const issueToken = (u) => signJwt({ uid: u.id, email: u.email });
 
@@ -74,12 +68,12 @@ app.post("/api/auth/signup", async (req, res) => {
   if (pwProblem) return fail(res, 400, pwProblem);
   try {
     if (await db.getUserByEmail(email)) return fail(res, 409, "An account with that email already exists.");
+    // Email verification + password reset are deferred until we have a verified
+    // sending domain (need to buy one). For now we only enforce a unique email and
+    // accounts are usable immediately.
     const user = await db.createUser({
-      email, name, passwordHash: await hashPassword(password), provider: "password", emailVerified: false,
+      email, name, passwordHash: await hashPassword(password), provider: "password", emailVerified: true,
     });
-    const token = randomToken();
-    await db.createEmailToken({ userId: user.id, kind: "verify", token, ttlMinutes: 60 * 24 });
-    sendVerificationEmail(user.email, token).catch((e) => console.warn("verify email failed:", e.message));
     db.logUsage({ userId: user.id, type: "signup" });
     res.json({ ok: true, token: issueToken(user), user: publicUser(user) });
   } catch (err) {
@@ -120,66 +114,10 @@ app.post("/api/auth/google", async (req, res) => {
   }
 });
 
-app.post("/api/auth/verify-email", async (req, res) => {
-  const { token } = req.body || {};
-  try {
-    const userId = await db.consumeEmailToken(token, "verify");
-    if (!userId) return fail(res, 400, "This verification link is invalid or has expired.");
-    await db.setEmailVerified(userId);
-    const user = await db.getUserById(userId);
-    res.json({ ok: true, token: issueToken(user), user: publicUser(user) });
-  } catch (err) {
-    fail(res, 500, String(err?.message || err));
-  }
-});
-
-app.post("/api/auth/resend-verification", requireAuth, async (req, res) => {
-  try {
-    if (req.user.email_verified) return res.json({ ok: true, alreadyVerified: true });
-    const token = randomToken();
-    await db.createEmailToken({ userId: req.user.id, kind: "verify", token, ttlMinutes: 60 * 24 });
-    await sendVerificationEmail(req.user.email, token);
-    res.json({ ok: true });
-  } catch (err) {
-    fail(res, 500, String(err?.message || err));
-  }
-});
-
-// Always reply ok (don't leak which emails exist).
-app.post("/api/auth/request-reset", async (req, res) => {
-  const { email } = req.body || {};
-  try {
-    const user = await db.getUserByEmail(email || "");
-    if (user) {
-      const token = randomToken();
-      await db.createEmailToken({ userId: user.id, kind: "reset", token, ttlMinutes: 60 });
-      sendResetEmail(user.email, token).catch((e) => console.warn("reset email failed:", e.message));
-    }
-    res.json({ ok: true });
-  } catch (err) {
-    fail(res, 500, String(err?.message || err));
-  }
-});
-
-app.post("/api/auth/reset-password", async (req, res) => {
-  const { token, password } = req.body || {};
-  const pwProblem = passwordProblem(password);
-  if (pwProblem) return fail(res, 400, pwProblem);
-  try {
-    const userId = await db.consumeEmailToken(token, "reset");
-    if (!userId) return fail(res, 400, "This reset link is invalid or has expired.");
-    await db.setPasswordHash(userId, await hashPassword(password));
-    const user = await db.getUserById(userId);
-    res.json({ ok: true, token: issueToken(user), user: publicUser(user) });
-  } catch (err) {
-    fail(res, 500, String(err?.message || err));
-  }
-});
-
 app.get("/api/me", requireAuth, (req, res) => res.json({ ok: true, user: publicUser(req.user) }));
 
 // ── Intelligence pipeline (interactive; authed + verified) ───────────────────────
-app.post("/api/discover", requireAuth, requireVerified, async (req, res) => {
+app.post("/api/discover", requireAuth, async (req, res) => {
   const { idea, features } = req.body || {};
   if (!idea || !idea.trim()) return fail(res, 400, "Describe your idea first.");
   try {
@@ -199,7 +137,7 @@ app.post("/api/discover", requireAuth, requireVerified, async (req, res) => {
   }
 });
 
-app.post("/api/gather", requireAuth, requireVerified, async (req, res) => {
+app.post("/api/gather", requireAuth, async (req, res) => {
   const competitors = Array.isArray(req.body?.competitors) ? req.body.competitors : [];
   if (competitors.length === 0) return fail(res, 400, "No competitors to gather for.");
   if (!process.env.TAVILY_API_KEY) return fail(res, 500, "TAVILY_API_KEY not configured.");
@@ -212,7 +150,7 @@ app.post("/api/gather", requireAuth, requireVerified, async (req, res) => {
   }
 });
 
-app.post("/api/agent/:id", requireAuth, requireVerified, async (req, res) => {
+app.post("/api/agent/:id", requireAuth, async (req, res) => {
   const agent = ANALYSTS.find((a) => a.id === req.params.id);
   if (!agent) return fail(res, 404, `Unknown agent: ${req.params.id}`);
   const { idea, features, competitors, signals } = req.body || {};
@@ -235,7 +173,7 @@ app.post("/api/agent/:id", requireAuth, requireVerified, async (req, res) => {
 });
 
 // Strategy synthesis. Also persists the sweep under the user's idea (the cache).
-app.post("/api/strategy", requireAuth, requireVerified, async (req, res) => {
+app.post("/api/strategy", requireAuth, async (req, res) => {
   const { idea, features, space, competitors, marketing, product, sales } = req.body || {};
   try {
     const result = await runAgent({

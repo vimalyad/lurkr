@@ -62,11 +62,6 @@ export function verifyJwt(token) {
   return payload;
 }
 
-// ── One-time tokens (email verify / password reset) ────────────────────────────
-export function randomToken() {
-  return randomBytes(32).toString("hex");
-}
-
 // ── Google sign-in ─────────────────────────────────────────────────────────────
 // The frontend (Google Identity Services) hands us an ID token; we validate it
 // against Google's tokeninfo endpoint and confirm the audience is our client.
