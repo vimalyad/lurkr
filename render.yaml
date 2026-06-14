@@ -1,0 +1,17 @@
+# Render Blueprint — hosts the Lurkr Express backend (the APK / web frontend calls it).
+# Deploy: render.com → New → Blueprint → connect the GitHub repo → set the 3 secret env vars.
+services:
+  - type: web
+    name: lurkr-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server/index.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false   # set in the Render dashboard
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false   # your Neon connection string

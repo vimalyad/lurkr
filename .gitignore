@@ -15,3 +15,6 @@
 /android/.idea
 /android/captures
 *.apk
+
+# Claude Code local config
+.claude/

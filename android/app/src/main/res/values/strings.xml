@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Lurkr</string>
+    <string name="title_activity_main">Lurkr</string>
+    <string name="package_name">com.lurkr.app</string>
+    <string name="custom_url_scheme">com.lurkr.app</string>
+</resources>

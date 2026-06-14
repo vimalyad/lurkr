@@ -9,6 +9,7 @@ import cors from "cors";
 import { runAgent } from "../src/lib/openrouter.js";
 import { DISCOVERY, ANALYSTS, STRATEGY } from "../src/lib/agents.js";
 import { gatherSignals } from "../src/lib/gather.js";
+import { initDb, dbEnabled, saveSweep, recentSweeps } from "../src/lib/db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -27,7 +28,7 @@ const app = express();
 app.use(cors()); // open CORS — local laptop backend for the APK/browser
 app.use(express.json({ limit: "1mb" }));
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "lurkr-backend" }));
+app.get("/health", (_req, res) => res.json({ ok: true, service: "lurkr-backend", db: dbEnabled() }));
 
 app.post("/api/discover", async (req, res) => {
   const { idea, features } = req.body || {};
@@ -91,13 +92,36 @@ app.post("/api/strategy", async (req, res) => {
       system: STRATEGY.system,
       user: JSON.stringify(req.body || {}),
     });
+    // best-effort persistence — never blocks or fails the response
+    const { idea, features, space, competitors } = req.body || {};
+    saveSweep({ idea, features, space, competitors, brief: result }).catch((e) =>
+      console.warn("saveSweep failed:", e.message)
+    );
     res.json({ agent: "strategy", ok: true, ...result });
   } catch (err) {
     res.status(500).json({ agent: "strategy", ok: false, error: String(err?.message || err) });
   }
 });
 
-const PORT = process.env.BACKEND_PORT || 8787;
-app.listen(PORT, "0.0.0.0", () => {
+app.get("/api/history", async (_req, res) => {
+  try {
+    res.json({ ok: true, sweeps: await recentSweeps(20) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+const PORT = process.env.PORT || process.env.BACKEND_PORT || 8787;
+app.listen(PORT, "0.0.0.0", async () => {
   console.log(`Lurkr backend listening on http://0.0.0.0:${PORT}`);
+  if (dbEnabled()) {
+    try {
+      await initDb();
+      console.log("Neon persistence: ready");
+    } catch (e) {
+      console.warn("Neon persistence: init failed —", e.message);
+    }
+  } else {
+    console.log("Neon persistence: disabled (no DATABASE_URL)");
+  }
 });

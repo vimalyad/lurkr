@@ -51,6 +51,11 @@ export default function App() {
   const [space, setSpace] = useState("");
   const [competitors, setCompetitors] = useState([]);
 
+  // Guided intake: product → features (optional) → confirm. `confirmed` flips the UI
+  // from the wizard to the results view. Typed values persist across back/edit.
+  const [step, setStep] = useState("product"); // "product" | "features" | "confirm"
+  const [confirmed, setConfirmed] = useState(false);
+
   const [discovering, setDiscovering] = useState(false);
   const [agents, setAgents] = useState(initialAgentState);
   const [strategy, setStrategy] = useState({ status: "idle", brief: null });
@@ -92,6 +97,18 @@ export default function App() {
 
   const removeCompetitor = (i) =>
     setCompetitors((prev) => prev.filter((_, idx) => idx !== i));
+
+  // Confirm the intake → kick off discovery and switch to the results view.
+  const confirmAndDiscover = useCallback(() => {
+    setConfirmed(true);
+    discover();
+  }, [discover]);
+
+  // Re-open the wizard at step 1; typed values are kept.
+  const editIntake = useCallback(() => {
+    setConfirmed(false);
+    setStep("product");
+  }, []);
 
   const runSweep = useCallback(async () => {
     if (!hasCompetitors) return;
@@ -157,7 +174,7 @@ export default function App() {
       const res = await fetch(`${API}/api/strategy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea, features, ...Object.fromEntries(results) }),
+        body: JSON.stringify({ idea, features, space, competitors, ...Object.fromEntries(results) }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Strategy failed");
@@ -168,7 +185,7 @@ export default function App() {
     } finally {
       setSweeping(false);
     }
-  }, [idea, features, competitors, hasCompetitors]);
+  }, [idea, features, competitors, space, hasCompetitors]);
 
   const busy = discovering || sweeping;
 
@@ -178,9 +195,16 @@ export default function App() {
       <header className="reveal pt-10 pb-7 flex items-end justify-between gap-4 border-b border-white/8">
         <div>
           <div className="label mb-2">Multi-agent market intelligence</div>
-          <h1 className="font-serif text-6xl sm:text-7xl leading-[0.85] tracking-tight">
-            Lurkr
-          </h1>
+          <div className="flex items-center gap-3">
+            <img
+              src="/lurkr-icon.png"
+              alt="Lurkr"
+              className="h-11 w-11 sm:h-14 sm:w-14 rounded-2xl shadow-lg shadow-black/40"
+            />
+            <h1 className="font-serif text-6xl sm:text-7xl leading-[0.85] tracking-tight">
+              Lurkr
+            </h1>
+          </div>
           <p className="font-serif italic text-base sm:text-lg text-neutral-400 mt-2">
             always watching, never blinking
           </p>
@@ -194,38 +218,130 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Step 1: the brief ───────────────────────────────────────────────── */}
-      <section className="reveal panel mt-7 p-5 sm:p-6" style={{ animationDelay: "0.05s" }}>
-        <div className="label mb-3">01 — Your product</div>
-        <textarea
-          value={idea}
-          onChange={(e) => setIdea(e.target.value)}
-          rows={3}
-          placeholder="Describe your startup or idea — e.g. a mobile-first AI notetaker that turns meetings into shareable team knowledge."
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-3.5 py-3 text-[15px] leading-relaxed outline-none focus:border-[var(--color-signal)]/60 transition-colors resize-none placeholder:text-neutral-600"
-        />
-        <textarea
-          value={features}
-          onChange={(e) => setFeatures(e.target.value)}
-          rows={2}
-          placeholder="Key features (optional) — real-time transcription, native mobile app, Slack integration, per-seat pricing…"
-          className="mt-2.5 w-full rounded-lg border border-white/10 bg-black/30 px-3.5 py-3 text-sm leading-relaxed outline-none focus:border-[var(--color-signal)]/60 transition-colors resize-none placeholder:text-neutral-600"
-        />
-        <div className="mt-4 flex items-center gap-3 flex-wrap">
-          <button
-            onClick={discover}
-            disabled={discovering || !idea.trim()}
-            className="rounded-lg bg-[var(--color-signal)] text-black hover:brightness-110 active:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 text-sm font-semibold tracking-tight transition"
-          >
-            {discovering ? "Scanning the market…" : hasCompetitors ? "Re-scan" : "Find my competitors"}
-          </button>
-          {space && (
-            <span className="label">
-              space: <span className="text-neutral-300 normal-case tracking-normal">{space}</span>
-            </span>
+      {/* ── Guided intake (wizard) OR collapsed summary once confirmed ──────── */}
+      {!confirmed ? (
+        <section key={step} className="reveal panel mt-7 p-5 sm:p-6" style={{ animationDelay: "0.05s" }}>
+          <Stepper step={step} />
+
+          {step === "product" && (
+            <div className="mt-4">
+              <h2 className="font-serif text-2xl mb-1">What are you building?</h2>
+              <p className="text-sm text-neutral-500 mb-3">Describe your startup or idea in a sentence or two.</p>
+              <textarea
+                value={idea}
+                onChange={(e) => setIdea(e.target.value)}
+                autoFocus
+                rows={4}
+                placeholder="e.g. A mobile-first AI notetaker that turns meetings into shareable team knowledge."
+                className="w-full rounded-lg border border-white/10 bg-black/30 px-3.5 py-3 text-[15px] leading-relaxed outline-none focus:border-[var(--color-signal)]/60 transition-colors resize-none placeholder:text-neutral-600"
+              />
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => setStep("features")}
+                  disabled={!idea.trim()}
+                  className="rounded-lg bg-[var(--color-signal)] text-black hover:brightness-110 active:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 text-sm font-semibold tracking-tight transition"
+                >
+                  Continue →
+                </button>
+              </div>
+            </div>
           )}
-        </div>
-      </section>
+
+          {step === "features" && (
+            <div className="mt-4">
+              <h2 className="font-serif text-2xl mb-1">
+                Key features <span className="text-neutral-500 text-lg italic">— optional</span>
+              </h2>
+              <p className="text-sm text-neutral-500 mb-3">
+                What sets it apart? Helps tailor the analysis. You can skip this.
+              </p>
+              <textarea
+                value={features}
+                onChange={(e) => setFeatures(e.target.value)}
+                autoFocus
+                rows={3}
+                placeholder="e.g. real-time transcription, native mobile app, Slack integration, per-seat pricing"
+                className="w-full rounded-lg border border-white/10 bg-black/30 px-3.5 py-3 text-sm leading-relaxed outline-none focus:border-[var(--color-signal)]/60 transition-colors resize-none placeholder:text-neutral-600"
+              />
+              <div className="mt-4 flex justify-between">
+                <button
+                  onClick={() => setStep("product")}
+                  className="rounded-lg border border-white/10 hover:bg-white/5 px-4 py-2.5 text-sm font-medium transition"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={() => setStep("confirm")}
+                  className="rounded-lg bg-[var(--color-signal)] text-black hover:brightness-110 active:brightness-95 px-5 py-2.5 text-sm font-semibold tracking-tight transition"
+                >
+                  {features.trim() ? "Continue →" : "Skip →"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === "confirm" && (
+            <div className="mt-4">
+              <h2 className="font-serif text-2xl mb-3">Ready to scan?</h2>
+              <div className="space-y-3">
+                <div>
+                  <div className="label mb-1">Product</div>
+                  <p className="text-[15px] text-neutral-200 leading-relaxed">{idea}</p>
+                </div>
+                <div>
+                  <div className="label mb-1">Key features</div>
+                  <p className="text-sm leading-relaxed">
+                    {features.trim() ? (
+                      <span className="text-neutral-300">{features}</span>
+                    ) : (
+                      <span className="text-neutral-600 italic">none provided</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 flex justify-between">
+                <button
+                  onClick={() => setStep("product")}
+                  className="rounded-lg border border-white/10 hover:bg-white/5 px-4 py-2.5 text-sm font-medium transition"
+                >
+                  ← Edit
+                </button>
+                <button
+                  onClick={confirmAndDiscover}
+                  className="rounded-lg bg-[var(--color-signal)] text-black hover:brightness-110 active:brightness-95 px-5 py-2.5 text-sm font-semibold tracking-tight transition"
+                >
+                  ✓ Confirm &amp; find competitors
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="reveal panel mt-7 p-4 sm:p-5 flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="label mb-1">Your product</div>
+            <p className="font-serif text-xl leading-tight truncate">{idea}</p>
+            {features.trim() && (
+              <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{features}</p>
+            )}
+            <div className="mt-2 flex items-center gap-3">
+              {space && (
+                <span className="label">
+                  space: <span className="text-neutral-300 normal-case tracking-normal">{space}</span>
+                </span>
+              )}
+              {discovering && <span className="label !text-[var(--color-signal)] animate-pulse">scanning the market…</span>}
+            </div>
+          </div>
+          <button
+            onClick={editIntake}
+            disabled={discovering || sweeping}
+            className="shrink-0 rounded-lg border border-white/10 hover:bg-white/5 disabled:opacity-40 px-3.5 py-2 text-xs font-medium transition"
+          >
+            Edit
+          </button>
+        </section>
+      )}
 
       {error && (
         <pre className="reveal mt-5 rounded-lg border border-red-900/70 bg-red-950/30 p-4 text-sm text-red-300 whitespace-pre-wrap mono">
@@ -401,6 +517,36 @@ export default function App() {
         </section>
       )}
     </main>
+  );
+}
+
+function Stepper({ step }) {
+  const steps = [
+    { id: "product", label: "Product" },
+    { id: "features", label: "Features" },
+    { id: "confirm", label: "Confirm" },
+  ];
+  const idx = steps.findIndex((s) => s.id === step);
+  return (
+    <div className="flex items-center gap-2">
+      {steps.map((s, i) => (
+        <div key={s.id} className="flex items-center gap-2">
+          <span
+            className={`flex items-center gap-1.5 label ${
+              i === idx ? "!text-[var(--color-signal)]" : i < idx ? "text-neutral-400" : "text-neutral-600"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                i === idx ? "bg-[var(--color-signal)]" : i < idx ? "bg-neutral-400" : "bg-neutral-700"
+              }`}
+            />
+            {s.label}
+          </span>
+          {i < steps.length - 1 && <span className="text-neutral-700 text-xs">→</span>}
+        </div>
+      ))}
+    </div>
   );
 }
 

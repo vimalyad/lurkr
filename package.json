@@ -8,15 +8,22 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.mjs",
+    "start": "node server/index.mjs",
     "optimize": "node scripts/optimize-prompts.mjs"
   },
   "dependencies": {
+    "@capacitor/core": "^7.6.6",
+    "@capacitor/status-bar": "^7.0.6",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "pg": "^8.21.0",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^7.6.6",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.6.6",
     "@tailwindcss/vite": "^4.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "tailwindcss": "^4.0.0",
