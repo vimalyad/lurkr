@@ -56,7 +56,9 @@ never shipped inside the APK):
 - **Backend:** Express (`server/`), reuses `src/lib/*`; hosted on **Render**
 - **OpenRouter** (OpenAI-compatible) — LLM calls (analysts on a fast model, Strategy/Discovery on a stronger one)
 - **Tavily** + **Google News RSS** — live competitor signals
-- **Neon** (Postgres) — persists every sweep (optional, gated on `DATABASE_URL`)
+- **Neon** (Postgres) — accounts + every user's ideas and cached analyses
+- **Auth** — roll-our-own on Neon: scrypt passwords + HS256 JWTs + Google sign-in (zero extra deps)
+- **Daily refresh** — a GitHub Actions schedule re-runs opted-in ideas at 04:00 IST
 
 ## Getting started (local dev)
 
@@ -78,26 +80,53 @@ Env vars (see `.env.example`, read by the backend):
 |---|---|---|
 | `OPENROUTER_API_KEY` | all LLM calls | openrouter.ai |
 | `TAVILY_API_KEY` | live web-search signals | tavily.com (free tier) |
-| `DATABASE_URL` | persistence (optional) | neon.tech (free Postgres) |
+| `DATABASE_URL` | accounts + saved ideas (**required**) | neon.tech (free Postgres) |
+| `JWT_SECRET` | signing session tokens | `openssl rand -hex 32` |
+| `GOOGLE_CLIENT_ID` | Google sign-in | Google Cloud Console (OAuth web client) |
+| `CRON_SECRET` | locks the daily-refresh endpoint | `openssl rand -hex 32` (also a GH secret) |
+
+> Email verification + password reset are **disabled for now** (they need a verified
+> sending domain — we need to buy one first). Email/password signup only enforces a
+> unique email until then; no email provider is configured.
+
+Frontend build-time vars (set in CI / `vite build` env, not in `.env.local`):
+`VITE_API_URL` (backend base URL) and `VITE_GOOGLE_CLIENT_ID` (Google button).
 
 ## Project layout
 
 - `index.html`, `src/main.jsx`, `src/App.jsx` — the Vite frontend (guided intake + dashboard)
 - `src/index.css` — Tailwind v4 + the design system
-- `server/index.mjs` — Express backend: `/api/discover`, `/api/gather`, `/api/agent/:id`, `/api/strategy`, `/api/history`, `/health`
-- `src/lib/agents.js` — agent prompts + model config
-- `src/lib/openrouter.js` — OpenRouter client (retry + JSON parsing)
-- `src/lib/gather.js` — bucketed live-signal gathering
-- `src/lib/db.js` — optional Neon persistence
-- `src/lib/sources/` — Tavily + Google News source clients
+- `src/App.jsx` — auth gate (session check, verify/reset links) → `AuthScreen` or `Dashboard`
+- `src/auth/AuthScreen.jsx` — sign in / sign up + Google button
+- `src/Dashboard.jsx` — the sweep UI, "My Ideas" view, daily-refresh toggle
+- `server/index.mjs` — Express backend: auth (`/api/auth/*`, `/api/me`), pipeline (`/api/discover`, `/api/gather`, `/api/agent/:id`, `/api/strategy`), ideas (`/api/ideas*`), `/api/cron/daily-refresh`, `/health`
+- `src/lib/auth.js` — scrypt + JWT + Google verify
+- `src/lib/db.js` — Neon: users, ideas, analyses (cache), usage_events
+- `src/lib/pipeline.js` — server-side full sweep (used by the daily cron)
+- `src/lib/agents.js` / `openrouter.js` / `gather.js` / `sources/` — agents + signals
+- `.github/workflows/daily-refresh.yml` — 04:00 IST scheduled refresh trigger
 - `scripts/optimize-prompts.mjs` — offline prompt-optimization harness
 - `render.yaml` — Render Blueprint for the backend
 - `android/` — Capacitor Android project
 
 ## Backend hosting (Render)
 
-The backend deploys to Render from `render.yaml` (Blueprint). Set `OPENROUTER_API_KEY`,
-`TAVILY_API_KEY`, and `DATABASE_URL` in the Render dashboard. It auto-deploys on push to `main`.
+The backend deploys to Render from `render.yaml` (Blueprint). Set all the env vars from the
+table above in the Render dashboard. It auto-deploys on push to `main`.
+
+## Accounts, persistence & daily refresh
+
+- **Hard auth gate.** No session → sign in (Google, or email + password). Sessions are
+  HS256 JWTs in `localStorage`. *Email verification + password reset are deferred until a
+  sending domain is purchased; for now signup only requires a unique email.*
+- **Per-user ideas.** Every sweep is saved under the user's idea (repeat searches of the
+  same idea append a new analysis). "My Ideas" lists them; opening one serves the latest
+  cached (stale-while-present) analysis. A cache miss just runs a live sweep, as before.
+- **Daily refresh.** Toggle it per idea. `daily-refresh.yml` fires at 22:30 UTC (04:00 IST),
+  calls the `CRON_SECRET`-protected `/api/cron/daily-refresh`, which re-runs the full sweep
+  for every opted-in idea and caches the result. `CRON_SECRET` must match in **both** the
+  GitHub repo secrets and the Render env.
+- **Usage** is logged to `usage_events` (no billing yet — groundwork for usage-based pricing).
 
 ## Android app — automated, build-once
 

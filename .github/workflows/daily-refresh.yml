@@ -1,0 +1,23 @@
+# Daily idea refresh. Fires at 22:30 UTC = 04:00 IST and pings the backend's
+# protected cron endpoint, which re-runs the full sweep for every idea opted into
+# daily refresh and caches the result. The shared CRON_SECRET locks the endpoint.
+name: Daily idea refresh
+
+on:
+  schedule:
+    - cron: "30 22 * * *" # 22:30 UTC == 04:00 Asia/Kolkata
+  workflow_dispatch: {} # allow a manual refresh from the Actions tab
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger daily refresh
+        run: |
+          code=$(curl -s -o /tmp/resp.json -w "%{http_code}" --max-time 180 -X POST \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            https://lurkr-jgdu.onrender.com/api/cron/daily-refresh)
+          echo "HTTP $code"
+          cat /tmp/resp.json 2>/dev/null || true
+          echo
+          if [ "$code" != "200" ]; then echo "::error::daily-refresh trigger failed ($code)"; exit 1; fi

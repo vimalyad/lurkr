@@ -14,4 +14,12 @@ services:
       - key: TAVILY_API_KEY
         sync: false
       - key: DATABASE_URL
-        sync: false   # your Neon connection string
+        sync: false   # your Neon connection string (required for auth + saved ideas)
+      - key: JWT_SECRET
+        sync: false   # openssl rand -hex 32
+      - key: GOOGLE_CLIENT_ID
+        sync: false   # Google OAuth web client id (for Google sign-in)
+      - key: CRON_SECRET
+        sync: false   # MUST match the CRON_SECRET in GitHub repo secrets
+      # NOTE: email verification + password reset are disabled until a sending
+      # domain is purchased — no RESEND_API_KEY / APP_URL needed for now.

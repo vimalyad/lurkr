@@ -35,6 +35,7 @@ jobs:
       - name: Build
         env:
           VITE_API_URL: https://lurkr-jgdu.onrender.com
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
         run: npm run build -- --base=/lurkr/
 
       - uses: actions/configure-pages@v5
