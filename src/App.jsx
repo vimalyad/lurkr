@@ -195,7 +195,6 @@ export default function App() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="reveal pt-10 pb-7 flex items-end justify-between gap-4 border-b border-white/8">
         <div>
-          <div className="label mb-2">Multi-agent market intelligence</div>
           <div className="flex items-center gap-3">
             <img
               src={lurkrIcon}
