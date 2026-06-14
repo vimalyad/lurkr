@@ -22,6 +22,37 @@ const initialAgentState = () => ({
   sales: { status: "idle", findings: [] },
 });
 
+// Colour-code the per-finding tag so the dashboard reads at a glance.
+const TAG_TONE = {
+  rising: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
+  declining: "text-red-300 border-red-500/30 bg-red-500/10",
+  flat: "text-neutral-300 border-white/10",
+  pos: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
+  neg: "text-red-300 border-red-500/30 bg-red-500/10",
+  mixed: "text-amber-300 border-amber-500/30 bg-amber-500/10",
+  high: "text-red-300 border-red-500/30 bg-red-500/10",
+  med: "text-amber-300 border-amber-500/30 bg-amber-500/10",
+  low: "text-neutral-300 border-white/10",
+};
+const tagTone = (v) => TAG_TONE[String(v || "").toLowerCase().trim()] || "text-neutral-300 border-white/10";
+
+// Watch items come back as plain strings OR objects of varying shapes; extract a
+// readable title (+ optional detail) instead of dumping a raw JSON blob.
+function watchItemFields(w) {
+  if (w == null) return { title: "", detail: "" };
+  if (typeof w === "string") return { title: w, detail: "" };
+  if (typeof w !== "object") return { title: String(w), detail: "" };
+  const pick = (...keys) => {
+    for (const k of keys) if (typeof w[k] === "string" && w[k].trim()) return w[k].trim();
+    return "";
+  };
+  const title = pick("item", "title", "name", "signal", "headline", "watch", "topic", "competitor", "what");
+  const detail = pick("detail", "why", "reason", "note", "description", "action", "rationale", "context", "impact");
+  if (title || detail) return { title, detail };
+  const vals = Object.values(w).filter((v) => typeof v === "string" && v.trim());
+  return { title: vals.join(" — "), detail: "" };
+}
+
 export default function Dashboard({ user, onSignOut }) {
   const [view, setView] = useState("search"); // "search" | "ideas"
 
@@ -191,7 +222,7 @@ export default function Dashboard({ user, onSignOut }) {
   return (
     <main className="min-h-dvh px-4 sm:px-6 pb-16 max-w-5xl mx-auto">
       {/* ── Header ───────────────────────────────────────────────────────────── */}
-      <header className="reveal pt-10 pb-7 flex items-start justify-between gap-4 border-b border-white/8">
+      <header className="reveal pt-8 sm:pt-10 pb-7 flex items-start justify-between gap-4 border-b border-white/8">
         <div>
           <div className="flex items-center gap-3">
             <img src={lurkrIcon} alt="Lurkr" className="h-11 w-11 sm:h-14 sm:w-14 rounded-2xl shadow-lg shadow-black/40" />
@@ -341,15 +372,22 @@ export default function Dashboard({ user, onSignOut }) {
                       <p className="label !tracking-wide !lowercase mt-1.5">{a.blurb}</p>
                       <div className="mt-3.5 grid gap-2">
                         {state.findings.map((f, i) => (
-                          <div key={i} className="reveal rounded-lg border border-white/8 bg-black/25 p-3" style={{ animationDelay: `${0.05 * i}s` }}>
+                          <div key={i} className="reveal rounded-lg border border-white/8 bg-black/25 p-3 hover:border-white/15 transition-colors" style={{ animationDelay: `${0.05 * i}s` }}>
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-sm font-medium">{f.competitor}</span>
-                              {a.tag(f) && <span className="label !text-[10px] rounded border border-white/10 px-1.5 py-0.5 text-neutral-300 whitespace-nowrap">{a.tag(f)}</span>}
+                              <span className="text-sm font-semibold text-neutral-100 truncate">{f.competitor}</span>
+                              {a.tag(f) && (
+                                <span className={`label !text-[10px] rounded-full border px-2 py-0.5 whitespace-nowrap ${tagTone(a.tag(f))}`}>
+                                  {a.tag(f)}
+                                </span>
+                              )}
                             </div>
-                            <p className="mt-1.5 text-xs text-neutral-300 leading-relaxed">{a.headline(f)}</p>
-                            {a.sub(f) && <p className="mt-1 text-[11px] text-neutral-600 italic">↳ {a.sub(f)}</p>}
+                            {a.headline(f) && <p className="mt-1.5 text-[13px] text-neutral-200 leading-relaxed">{a.headline(f)}</p>}
+                            {a.sub(f) && <p className="mt-1.5 text-[11px] text-neutral-500 leading-relaxed border-l border-white/10 pl-2">{a.sub(f)}</p>}
                           </div>
                         ))}
+                        {state.status === "done" && state.findings.length === 0 && (
+                          <p className="text-xs text-neutral-600 italic px-1">No signals surfaced for this lens.</p>
+                        )}
                       </div>
                     </div>
                   );
@@ -374,11 +412,21 @@ export default function Dashboard({ user, onSignOut }) {
                   </div>
                   {Array.isArray(strategy.brief.watch_items) && strategy.brief.watch_items.length > 0 && (
                     <div className="mt-6 border-t border-white/8 pt-4">
-                      <div className="label mb-2">Watch items</div>
-                      <ul className="space-y-1.5">
-                        {strategy.brief.watch_items.map((w, i) => (
-                          <li key={i} className="flex gap-2 text-sm text-neutral-300"><span className="text-[var(--color-signal)] mono text-xs mt-0.5">▸</span><span>{typeof w === "string" ? w : JSON.stringify(w)}</span></li>
-                        ))}
+                      <div className="label mb-3">Watch items</div>
+                      <ul className="grid gap-2">
+                        {strategy.brief.watch_items.map((w, i) => {
+                          const { title, detail } = watchItemFields(w);
+                          if (!title && !detail) return null;
+                          return (
+                            <li key={i} className="flex gap-2.5 rounded-lg border border-white/8 bg-black/20 px-3 py-2">
+                              <span className="text-[var(--color-signal)] mono text-xs mt-0.5 shrink-0">▸</span>
+                              <div className="min-w-0">
+                                {title && <p className="text-sm text-neutral-200 leading-snug">{title}</p>}
+                                {detail && <p className="text-xs text-neutral-500 leading-relaxed mt-0.5">{detail}</p>}
+                              </div>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   )}

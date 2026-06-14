@@ -23,6 +23,15 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Keep content clear of the status bar / notch (viewport-fit=cover is set), and
+   give the whole UI a little breathing room from the very top of the screen. */
+body {
+  padding-top: calc(env(safe-area-inset-top) + 0.5rem);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 /* ── Atmosphere: amber wash + faint grid, vignetted, with a grain overlay ───── */
 body::before {
   content: "";
